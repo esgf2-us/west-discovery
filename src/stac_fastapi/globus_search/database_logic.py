@@ -3,6 +3,8 @@ This definition is a fork of the one from the Mongo backend for
 stac-fastapi, modified to work on Globus Search.
 """
 
+import json
+import os
 import typing as t
 
 import attrs
@@ -199,6 +201,12 @@ class DatabaseLogic:
     collection_serializer: type[serializers.CollectionSerializer] = attrs.field(
         default=serializers.CollectionSerializer
     )
+
+    async def find_collection(self, collection_id: str) -> dict:
+        path = os.path.dirname(os.path.realpath(__file__))
+        f = open(path + f"/schemas/{collection_id}.json")
+        data = json.load(f)
+        return data
 
     async def get_all_collections(
         self, token: str | None, limit: int, base_url: str
