@@ -1,0 +1,24 @@
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
+
+[tool.poetry]
+name = "stac_fastapi.globus_search"
+version = "0.0.1"
+description = "A Globus Search stac-fastapi frontend demo"
+license = "Apache-2.0"
+authors = ["Stephen Rosen <sirosen@globus.org>"]
+packages = [
+  { include = "stac_fastapi", from = "src" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.12.0"
+globus-sdk = "*"
+attrs = "*"
+
+# WARNING: this is part of the opensearch/ES backend, not directly stac-fastapi
+stac-fastapi-core = "3.0.0a1"
+
+[tool.poetry.scripts]
+stac-fastapi-globus-search = "stac_fastapi.globus_search.app:run"
