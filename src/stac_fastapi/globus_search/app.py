@@ -53,7 +53,7 @@ api = StacApi(
     search_get_request_model=create_get_request_model(extensions),
     search_post_request_model=post_request_model,
 )
-app = api.app
+handler = api.app
 
 apply_basic_auth(api)
 

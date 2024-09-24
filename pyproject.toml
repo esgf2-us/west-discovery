@@ -18,7 +18,9 @@ globus-sdk = "*"
 attrs = "*"
 
 # WARNING: this is part of the opensearch/ES backend, not directly stac-fastapi
+mangum = "^0.18.0"
 stac-fastapi-core = "3.0.0a1"
+uvicorn = "^0.30.6"
 
 [tool.poetry.scripts]
 stac-fastapi-globus-search = "stac_fastapi.globus_search.app:run"
