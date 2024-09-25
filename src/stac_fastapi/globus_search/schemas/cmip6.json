@@ -30,7 +30,7 @@
       "href": "http://localhost:8000/collections/cmip6"
     }
   ],
-  "id": "cmip6",
+  "id": "CMIP6",
   "type": "Collection",
   "providers": [],
   "summaries": {

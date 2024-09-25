@@ -273,6 +273,13 @@ class DatabaseLogic:
         ignore_unavailable: bool = True,
     ) -> tuple[t.Iterable[dict[str, t.Any]], int | None, str | None]:
         filters = search.get("filters", ())
+
+        # Fix/Hack for collection/project coming through in lower case
+        # for filter in filters:
+        #     if filter["field_name"] == "collection":
+        #         for value in filter["values"]:
+        #             filter["values"] = [value.upper()]
+
         if len(filters) == 0:
             search.set_query("*")
 
