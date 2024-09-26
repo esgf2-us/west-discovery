@@ -204,7 +204,7 @@ class DatabaseLogic:
 
     async def find_collection(self, collection_id: str) -> dict:
         path = os.path.dirname(os.path.realpath(__file__))
-        f = open(path + f"/schemas/{collection_id.lower()}.json")
+        f = open(path + f"/schemas/{collection_id}.json")
         data = json.load(f)
         return data
 
@@ -278,12 +278,6 @@ class DatabaseLogic:
         ignore_unavailable: bool = True,
     ) -> tuple[t.Iterable[dict[str, t.Any]], int | None, str | None]:
         filters = search.get("filters", ())
-
-        # Fix/Hack for collection/project coming through in lower case
-        # for filter in filters:
-        #     if filter["field_name"] == "collection":
-        #         for value in filter["values"]:
-        #             filter["values"] = [value.upper()]
 
         if len(filters) == 0:
             search.set_query("*")
