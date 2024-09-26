@@ -4,5 +4,12 @@ import json
 def search_doc_to_stac_item(search_doc):
     assert len(search_doc["entries"]) == 1
     content = dict(search_doc["entries"][0]["content"])
-    content["assets"] = json.loads(json.dumps(content["assets"]))
+
+    # Convert assets from list to dict
+    list_assets = json.loads(json.dumps(content["assets"]))
+    dict_assets = {}
+    for asset in list_assets:
+        dict_assets[asset["name"]] = asset
+    content["assets"] = dict_assets
+
     return content
