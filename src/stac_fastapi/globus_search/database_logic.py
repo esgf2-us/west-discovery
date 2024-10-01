@@ -211,7 +211,12 @@ class DatabaseLogic:
     async def get_all_collections(
         self, token: str | None, limit: int, base_url: str
     ) -> tuple[list[dict[str, t.Any]], str | None]:
-        return [], None
+        collections = []
+        path = os.path.dirname(os.path.realpath(__file__)) + "/schemas"
+        for filename in os.listdir(path):
+            f = open(path + f"/{filename}")
+            collections.append(json.load(f))
+        return collections, None
 
     async def get_one_item(self, collection_id: str, item_id: str) -> dict:
         res = _client.get_subject(SEARCH_INDEX_ID, item_id)
@@ -273,6 +278,7 @@ class DatabaseLogic:
         ignore_unavailable: bool = True,
     ) -> tuple[t.Iterable[dict[str, t.Any]], int | None, str | None]:
         filters = search.get("filters", ())
+
         if len(filters) == 0:
             search.set_query("*")
 

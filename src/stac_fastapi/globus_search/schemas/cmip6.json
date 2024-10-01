@@ -12,25 +12,25 @@
     {
       "rel": "items",
       "type": "application/geo+json",
-      "href": "http://localhost:8000/collections/cmip6/items"
+      "href": "https://api.stac.esgf-west.org/collections/CMIP6/items"
     },
     {
       "rel": "parent",
       "type": "application/json",
-      "href": "http://localhost:8000/"
+      "href": "https://api.stac.esgf-west.org/collections"
     },
     {
       "rel": "root",
       "type": "application/json",
-      "href": "http://localhost:8000/"
+      "href": "https://api.stac.esgf-west.org/"
     },
     {
       "rel": "self",
       "type": "application/json",
-      "href": "http://localhost:8000/collections/cmip6"
+      "href": "https://api.stac.esgf-west.org/collections/CMIP6"
     }
   ],
-  "id": "cmip6",
+  "id": "CMIP6",
   "type": "Collection",
   "providers": [],
   "summaries": {
