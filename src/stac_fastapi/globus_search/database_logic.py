@@ -9,6 +9,7 @@ import typing as t
 
 import attrs
 import globus_sdk
+
 from stac_fastapi.core import serializers
 
 from .config import SEARCH_INDEX_ID, GlobusSearchSettings
@@ -35,6 +36,8 @@ def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
     Our best reference right now for CQL2 definition is this OGC draft spec:
       https://docs.ogc.org/DRAFTS/21-065.html#temporal-functions
     """
+    if "op" not in cql_query:
+        return {}
     cql_op = cql_query["op"]
 
     # each group of matches is marked with one of the following qualifiers:
@@ -54,21 +57,44 @@ def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
             # wrap any inner filter in a not filter
             return {"type": "not", "filter": inner}
         case "and" | "or":
-            # requires Search filter additions
-            raise NotImplementedError("'and' and 'or' filters are not supported yet")
-        case "=" | "<>":
-            # Can these be cleanly supported in ES?
-            # The existing stac-fastapi-elasticsearch implementation uses a 'term'
-            # filter for these, which does not work on text fields (but will work on
-            # most numerics).
+            # As of query#1.0.0, there is a direct mapping of cql2 to Search for
+            # 'and' and 'or' ('op' --> 'type' and 'args' --> 'filter')
+            return {
+                "type": cql_op,
+                "filters": [cql_to_filter(inner) for inner in cql_query["args"]],
+            }
+        case "=":
+            # The CQL2 standards
+            # (https://docs.ogc.org/is/21-065r2/21-065r2.html) are highly
+            # detailed in their behavior and can express searches that are
+            # perhaps far more rich than is possible in Search (or at least for
+            # what Globus has implemented wrappers).
+
+            # As I look at the filter list
+            # (https://docs.globus.org/api/search/reference/post_query/#gfilter),
+            # it strikes me that `match_all` is perhaps the closest analog. I
+            # believe that CQL2 '=' works only for a single argument so it could
+            # also be `match_any`.
             #
-            # So the existing reference implementation may be wrong (?) unless the
-            # targets are known to be non-text fields.
-            # Even then, a 'term' filter would match on an array when given a single
-            # value, and cannot do exact array matching. Needs more research.
-            #
-            # it's not obvious how these should be supported especially over 'text'
-            raise NotImplementedError("'eq' and 'neq' filters are not supported yet")
+            # We have made the single arg assumption for several of these
+            # without checks that it is true.
+            assert len(cql_query["args"]) == 2
+            return {
+                "type": "match_any",
+                "field_name": cql_query["args"][0]["property"],
+                "values": [cql_query["args"][1]],
+            }
+        case "<>":
+            # 'not match_all', see comments in '=' above
+            assert len(cql_query["args"]) == 2
+            return {
+                "type": "not",
+                "filter": {
+                    "type": "match_any",
+                    "field_name": cql_query["args"][0]["property"],
+                    "values": [cql_query["args"][1]],
+                },
+            }
         case "<" | ">":
             # we only have '<=' and '>=' in Search today
             raise NotImplementedError("'>' and '<' filters are not supported yet")
