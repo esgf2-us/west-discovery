@@ -3,7 +3,7 @@ from stac_fastapi.types.config import ApiSettings
 
 
 # Index created by ALCF and populated with STAC items from netcdf files
-SEARCH_INDEX_ID = "f037bb33-3413-448b-8486-8400bee5181a"
+SEARCH_INDEX_ID = "06e2ca28-a0ed-467c-8b91-ed8151e7e578"
 
 
 class GlobusSearchSettings(ApiSettings):

@@ -316,4 +316,4 @@ class DatabaseLogic:
             print("SearchAPIError:")
             print(e.text)
             raise
-        return [search_doc_to_stac_item(doc) for doc in response["gmeta"]], None, None
+        return [search_doc_to_stac_item(doc) for doc in response["gmeta"]], response["total"], None

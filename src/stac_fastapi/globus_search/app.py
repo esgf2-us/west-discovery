@@ -26,7 +26,6 @@ database_logic = DatabaseLogic()
 
 extensions = [
     filter_extension,
-    # QueryExtension(),
 ]
 
 post_request_model = create_post_request_model(extensions)
