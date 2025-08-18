@@ -129,8 +129,11 @@ def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
             # range filter should work
             raise NotImplementedError("'between' filter is not supported yet")
         case "in":
-            # needs research, what would we need to do?
-            raise NotImplementedError("'in' filter is not supported yet")
+            return {
+                "type": "match_any",
+                "field_name": cql_query["args"][0]["property"],
+                "values": cql_query["args"][1],
+            }
         # SPATIAL OPERATORS (partial)
         # note that this divides in the filter spec between "Basic Spatial Operators"
         # and "Spatial Operators"
