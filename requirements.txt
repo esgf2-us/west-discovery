@@ -3,7 +3,7 @@ fastapi>=0.68.0
 globus_sdk==3.62.0
 pystac_client>=0.7.0
 stac-fastapi.api==3.0.0a0
-stac-fastapi.core==3.0.0a1
+stac-fastapi.core==3.0.0a0
 stac-fastapi.extensions==3.0.0a0
 stac-fastapi.types==3.0.0a0
 uvicorn==0.35.0
