@@ -9,7 +9,6 @@ import typing as t
 
 import attrs
 import globus_sdk
-
 from stac_fastapi.core import serializers
 
 from .config import SEARCH_INDEX_ID, GlobusSearchSettings
@@ -253,7 +252,7 @@ class DatabaseLogic:
 
     @staticmethod
     def make_search():
-        return globus_sdk.SearchQuery()
+        return globus_sdk.SearchScrollQuery()
 
     @staticmethod
     def apply_ids_filter(search: globus_sdk.SearchQuery, item_ids: list[str]):
@@ -313,10 +312,18 @@ class DatabaseLogic:
 
         search.set_limit(limit)
 
+        if token:
+            search.set_marker(token)
+
         try:
-            response = _client.post_search(SEARCH_INDEX_ID, search)
+            response = _client.scroll(SEARCH_INDEX_ID, search)
+            print(response["total"])
         except globus_sdk.SearchAPIError as e:
             print("SearchAPIError:")
             print(e.text)
             raise
-        return [search_doc_to_stac_item(doc) for doc in response["gmeta"]], response["total"], None
+        return (
+            [search_doc_to_stac_item(doc) for doc in response["gmeta"]],
+            response["total"],
+            response["marker"],
+        )

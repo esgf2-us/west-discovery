@@ -21,7 +21,6 @@ def search_doc_to_stac_item(search_doc):
 
                 asset["alternate"] = temp
 
-
     content["assets"] = dict_assets
 
     return content
