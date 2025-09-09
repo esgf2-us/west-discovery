@@ -71,6 +71,7 @@ class CustomizedCoreClient(CoreClient):
             links=links,
             numReturned=len(items),
             numMatched=total,
+            context={"matched": total},
         )
 
     async def post_search(self, search_request, request):
@@ -141,6 +142,7 @@ class CustomizedCoreClient(CoreClient):
             links=links,
             numReturned=len(items),
             numMatched=total,
+            context={"matched": total},
         )
 
 
