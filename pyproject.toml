@@ -14,13 +14,14 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.12.0"
-globus-sdk = "*"
-attrs = "*"
-
-# WARNING: this is part of the opensearch/ES backend, not directly stac-fastapi
-mangum = "^0.18.0"
-stac-fastapi-core = "3.0.0a1"
-uvicorn = "^0.30.6"
+attrs = "25.3.0"
+globus-sdk = "3.62.0"
+pystac-client = "0.7.0"
+stac-fastapi.api = "3.0.0a0"
+stac-fastapi.core = "3.0.0a1"
+stac-fastapi.extensions = "3.0.0a0"
+stac-fastapi.types = "3.0.0a0"
+uvicorn = "0.35.0"
 
 [tool.poetry.scripts]
 stac-fastapi-globus-search = "stac_fastapi.globus_search.app:run"

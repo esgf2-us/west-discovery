@@ -1,0 +1,50 @@
+{
+    "containerDefinitions": [
+        {
+            "name": "data-challenge-04-discovery",
+            "image": "730335463484.dkr.ecr.us-east-1.amazonaws.com/data-challenge-04-discovery",
+            "cpu": 0,
+            "portMappings": [
+                {
+                    "name": "data-challenge-04-discovery-8000-tcp",
+                    "containerPort": 8000,
+                    "hostPort": 8000,
+                    "protocol": "tcp",
+                    "appProtocol": "http"
+                }
+            ],
+            "essential": true,
+            "environment": [],
+            "environmentFiles": [],
+            "ulimits": [],
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-group": "/ecs/data-challenge-04-discovery",
+                    "awslogs-create-group": "true",
+                    "awslogs-region": "us-east-1",
+                    "awslogs-stream-prefix": "ecs"
+                },
+                "secretOptions": []
+            },
+            "systemControls": []
+        }
+    ],
+    "taskRoleArn": "arn:aws:iam::730335463484:role/ecsTaskExecutionRole",
+    "executionRoleArn": "arn:aws:iam::730335463484:role/ecsTaskExecutionRole",
+    "networkMode": "awsvpc",
+    "family": "data-challenge-04-discovery",
+    "volumes": [],
+    "placementConstraints": [],
+    "requiresCompatibilities": [
+        "FARGATE"
+    ],
+    "cpu": "1024",
+    "memory": "3072",
+    "runtimePlatform": {
+        "cpuArchitecture": "X86_64",
+        "operatingSystemFamily": "LINUX"
+    },
+    "enableFaultInjection": false,
+    "tags": []
+}

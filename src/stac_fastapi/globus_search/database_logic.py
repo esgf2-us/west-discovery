@@ -9,7 +9,6 @@ import typing as t
 
 import attrs
 import globus_sdk
-
 from stac_fastapi.core import serializers
 
 from .config import SEARCH_INDEX_ID, GlobusSearchSettings
@@ -129,8 +128,11 @@ def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
             # range filter should work
             raise NotImplementedError("'between' filter is not supported yet")
         case "in":
-            # needs research, what would we need to do?
-            raise NotImplementedError("'in' filter is not supported yet")
+            return {
+                "type": "match_any",
+                "field_name": cql_query["args"][0]["property"],
+                "values": cql_query["args"][1],
+            }
         # SPATIAL OPERATORS (partial)
         # note that this divides in the filter spec between "Basic Spatial Operators"
         # and "Spatial Operators"
@@ -250,7 +252,7 @@ class DatabaseLogic:
 
     @staticmethod
     def make_search():
-        return globus_sdk.SearchQuery()
+        return globus_sdk.SearchScrollQuery()
 
     @staticmethod
     def apply_ids_filter(search: globus_sdk.SearchQuery, item_ids: list[str]):
@@ -310,10 +312,18 @@ class DatabaseLogic:
 
         search.set_limit(limit)
 
+        if token:
+            search.set_marker(token)
+
         try:
-            response = _client.post_search(SEARCH_INDEX_ID, search)
+            response = _client.scroll(SEARCH_INDEX_ID, search)
+            print(response["total"])
         except globus_sdk.SearchAPIError as e:
             print("SearchAPIError:")
             print(e.text)
             raise
-        return [search_doc_to_stac_item(doc) for doc in response["gmeta"]], None, None
+        return (
+            [search_doc_to_stac_item(doc) for doc in response["gmeta"]],
+            response["total"],
+            response["marker"],
+        )
