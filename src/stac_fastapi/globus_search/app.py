@@ -6,19 +6,34 @@ stac-fastapi.
 from stac_fastapi.api.app import StacApi
 from stac_fastapi.api.models import (create_get_request_model,
                                      create_post_request_model)
+from stac_fastapi.core.extensions.aggregation import (
+    EsAggregationExtensionGetRequest,
+    EsAggregationExtensionPostRequest,
+)
 from stac_fastapi.core.session import Session
-from stac_fastapi.extensions.core import (FilterExtension, TokenPaginationExtension)
-
-# globus-search implementation
+from stac_fastapi.extensions.core import (
+    AggregationExtension,
+    FilterExtension,
+    TokenPaginationExtension
+)
 from stac_fastapi.globus_search.config import GlobusSearchSettings
 from stac_fastapi.globus_search.core import GlobusSearchClient
 from stac_fastapi.globus_search.database_logic import DatabaseLogic
+from stac_fastapi.globus_search.extensions.aggregration.client import GlobusSearchAggregationClient
 from stac_fastapi.sfeos_helpers.filter import EsAsyncBaseFiltersClient
 
 
 database_logic = DatabaseLogic()
 settings = GlobusSearchSettings()
 session = Session.create_from_settings(settings)
+
+aggregation_extension = AggregationExtension(
+    client=GlobusSearchAggregationClient(
+        database=database_logic, session=session, settings=settings
+    )
+)
+aggregation_extension.POST = EsAggregationExtensionPostRequest
+aggregation_extension.GET = EsAggregationExtensionGetRequest
 
 filter_extension = FilterExtension(
     client=EsAsyncBaseFiltersClient(database=database_logic)
@@ -28,20 +43,22 @@ filter_extension.conformance_classes.append(
 )
 pagination_extension = TokenPaginationExtension()
 
-extensions = [
+search_extensions = [
     filter_extension,
     pagination_extension,
 ]
 
-post_request_model = create_post_request_model(extensions)
+post_request_model = create_post_request_model(search_extensions)
 
+extensions = [aggregation_extension] + search_extensions
+    
 api = StacApi(
     settings=settings,
     extensions=extensions,
     client=GlobusSearchClient(
         database=database_logic, session=session, post_request_model=post_request_model
     ),
-    search_get_request_model=create_get_request_model(extensions),
+    search_get_request_model=create_get_request_model(search_extensions),
     search_post_request_model=post_request_model,
 )
 handler = api.app

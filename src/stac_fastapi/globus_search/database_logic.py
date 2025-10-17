@@ -233,7 +233,7 @@ class DatabaseLogic:
 
     async def find_collection(self, collection_id: str) -> dict:
         path = os.path.dirname(os.path.realpath(__file__))
-        f = open(path + f"/schemas/{collection_id}.json")
+        f = open(path + f"/schemas/{collection_id.upper()}.json")
         data = json.load(f)
         return data
 
@@ -318,7 +318,6 @@ class DatabaseLogic:
 
         try:
             response = _client.scroll(SEARCH_INDEX_ID, search)
-            print(response["total"])
         except globus_sdk.SearchAPIError as e:
             print("SearchAPIError:")
             print(e.text)
