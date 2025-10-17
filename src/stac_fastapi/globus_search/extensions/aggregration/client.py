@@ -246,7 +246,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     }
                     stac_buckets.append(stac_bucket)
                 stac_aggregation = {
-                    "name": facet["name"],
+                    "name": f"cmip6_{facet['name']}_frequency",
                     "data_type": "frequency_distribution",
                     "buckets": stac_buckets
                 }
