@@ -10,6 +10,7 @@ import typing as t
 import attrs
 import globus_sdk
 from stac_fastapi.core import serializers
+from starlette.requests import Request
 
 from .config import SEARCH_INDEX_ID, GlobusSearchSettings
 from .convert import search_doc_to_stac_item
@@ -232,12 +233,12 @@ class DatabaseLogic:
 
     async def find_collection(self, collection_id: str) -> dict:
         path = os.path.dirname(os.path.realpath(__file__))
-        f = open(path + f"/schemas/{collection_id}.json")
+        f = open(path + f"/schemas/{collection_id.upper()}.json")
         data = json.load(f)
         return data
 
     async def get_all_collections(
-        self, token: str | None, limit: int, base_url: str
+        self, token: str | None, limit: int, request: Request
     ) -> tuple[list[dict[str, t.Any]], str | None]:
         collections = []
         path = os.path.dirname(os.path.realpath(__file__)) + "/schemas"
@@ -317,7 +318,6 @@ class DatabaseLogic:
 
         try:
             response = _client.scroll(SEARCH_INDEX_ID, search)
-            print(response["total"])
         except globus_sdk.SearchAPIError as e:
             print("SearchAPIError:")
             print(e.text)
