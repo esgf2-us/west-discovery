@@ -1,6 +1,8 @@
 attrs==25.3.0
 fastapi>=0.68.0
 globus_sdk==3.62.0
+hishel==1.1.5
+hishel[async]==1.1.5
 pystac_client>=0.7.0
 sfeos-helpers==6.3.0
 stac-fastapi.api==6.0.0
