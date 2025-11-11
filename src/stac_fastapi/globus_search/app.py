@@ -3,6 +3,10 @@ This app definition is a fork of the one from the Mongo backend for
 stac-fastapi.
 """
 
+from hishel.fastapi import cache
+from hishel.asgi import ASGICacheMiddleware
+from hishel import AsyncSqliteStorage
+
 from stac_fastapi.api.app import StacApi
 from stac_fastapi.api.models import (create_get_request_model,
                                      create_post_request_model)
@@ -51,17 +55,28 @@ search_extensions = [
 post_request_model = create_post_request_model(search_extensions)
 
 extensions = [aggregation_extension] + search_extensions
-    
+
+route_dependencies = [
+    (
+        [{"path": "/collections/{collection_id}/items", "method": "GET"}],
+        [cache(max_age=300, public=True)]
+    )
+]
+
 api = StacApi(
     settings=settings,
     extensions=extensions,
     client=GlobusSearchClient(
         database=database_logic, session=session, post_request_model=post_request_model
     ),
+    route_dependencies=route_dependencies,
     search_get_request_model=create_get_request_model(search_extensions),
     search_post_request_model=post_request_model,
 )
-handler = api.app
+handler = ASGICacheMiddleware(
+    api.app,
+    storage=AsyncSqliteStorage(database_path="cache/hishel_cache.db"),
+)
 
 
 def run() -> None:
