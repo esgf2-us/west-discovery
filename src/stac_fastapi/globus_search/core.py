@@ -11,19 +11,22 @@ class GlobusSearchClient(CoreClient):
     async def item_collection(
         self,
         collection_id: str,
-        bbox: Optional[BBox] = None,
-        datetime: Optional[str] = None,
         limit: Optional[int] = 10,
         token: Optional[str] = None,
-        filter_expr: Optional[str] = None,
         **kwargs,
     ) -> stac_types.ItemCollection:
 
         request = kwargs.get("request")
+        search = self.database.make_search()
         token = request.query_params.get("token", token)
 
+        if collection_id:
+            search = self.database.apply_collections_filter(
+                search=search, collection_ids=[collection_id]
+            )
+
         items, total, next_marker = await self.database.execute_search(
-            search=self.database.make_search(),
+            search=search,
             limit=limit,
             token=token,
             sort=None,
