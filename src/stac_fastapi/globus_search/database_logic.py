@@ -315,8 +315,6 @@ class DatabaseLogic:
 
         if token:
             search.set_marker(token)
-
-        print(search)
         try:
             response = _client.scroll(SEARCH_INDEX_ID, search)
         except globus_sdk.SearchAPIError as e:
