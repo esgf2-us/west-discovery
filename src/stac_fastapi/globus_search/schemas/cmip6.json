@@ -1,12 +1,12 @@
 {
   "extent": {
-    "spatial": { "bbox": [[-180.0, -90.0, 179.99999991618097, 89.99999995809068]] },
+    "spatial": { "bbox": [[-180.0, -90.0, 180.0, 90.0]] },
     "temporal": {
       "interval": [["1850-01-01T00:00:00.000Z", "4114-12-16T12:00:00.000Z"]]
     }
   },
-  "stac_version": "1.1.0",
-  "license": "cmip6",
+  "stac_version": "1.0.1",
+  "license": "No license",
   "description": "CMIP6",
   "links": [
     {
