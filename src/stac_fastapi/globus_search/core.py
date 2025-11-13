@@ -1,10 +1,10 @@
 from typing import Optional
 
+from fastapi import HTTPException
 from stac_fastapi.core.core import CoreClient
 from stac_fastapi.core.models.links import PagingLinks
 
 from stac_fastapi.types import stac as stac_types
-from stac_pydantic.shared import BBox
 
 
 class GlobusSearchClient(CoreClient):
