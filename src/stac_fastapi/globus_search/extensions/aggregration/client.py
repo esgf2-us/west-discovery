@@ -187,9 +187,10 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
         self,
         aggregations: Optional[str] = None,
         collection_id: Optional[str] = None,
+        size: Optional[int] = 10,
         **kwargs,
     ) -> dict[str, Any]:
-        
+        print(size)
         request: Request = kwargs.get("request")
         base_url = str(request.base_url) if request else ""
         links = [{"rel": "root", "type": "application/json", "href": base_url}]
@@ -218,6 +219,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
 
         for aggregation in aggregations:
             if aggregation == "total_count":
+                response = self.client.post_search(SEARCH_INDEX_ID, search)
                 return {
                     "type": "AggregationCollection",
                     "aggregations": [
@@ -230,8 +232,13 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     "links": links,
                 }
             else:
-                facet = aggregation.lstrip("cmip6_").rstrip("_frequency")
-                search.add_facet(facet, field_name=f"properties.cmip6:{facet}", type="terms")
+                facet = aggregation.removeprefix("cmip6_").removesuffix("_frequency")
+                search.add_facet(
+                    facet,
+                    field_name=f"properties.cmip6:{facet}", 
+                    type="terms",
+                    size=size
+                )
 
         response = self.client.post_search(SEARCH_INDEX_ID, search)
 
@@ -251,7 +258,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     "buckets": stac_buckets
                 }
                 stac_aggregations.append(stac_aggregation)
-        
+
         return {
             "type": "AggregationCollection",
             "aggregations": stac_aggregations,
