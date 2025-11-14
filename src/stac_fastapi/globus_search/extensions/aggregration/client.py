@@ -190,7 +190,6 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
         size: Optional[int] = 10,
         **kwargs,
     ) -> dict[str, Any]:
-        print(size)
         request: Request = kwargs.get("request")
         base_url = str(request.base_url) if request else ""
         links = [{"rel": "root", "type": "application/json", "href": base_url}]
