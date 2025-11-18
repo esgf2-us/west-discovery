@@ -6,11 +6,10 @@ faceting capabilities, replacing ElasticSearch-based aggregations.
 """
 
 from typing import Any, Optional
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urljoin
 
 import attrs
 import globus_sdk
-from fastapi import HTTPException
 from stac_fastapi.core.base_database_logic import BaseDatabaseLogic
 from stac_fastapi.core.session import Session
 from stac_fastapi.extensions.core.aggregation.client import BaseAggregationClient
@@ -18,7 +17,6 @@ from stac_fastapi.extensions.core.aggregation.types import AggregationCollection
 from starlette.requests import Request
 
 from stac_fastapi.globus_search.config import SEARCH_INDEX_ID, GlobusSearchSettings
-from stac_fastapi.globus_search.database_logic import cql_to_filter
 
 
 @attrs.define
@@ -187,9 +185,9 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
         self,
         aggregations: Optional[str] = None,
         collection_id: Optional[str] = None,
+        size: Optional[int] = 10,
         **kwargs,
     ) -> dict[str, Any]:
-        
         request: Request = kwargs.get("request")
         base_url = str(request.base_url) if request else ""
         links = [{"rel": "root", "type": "application/json", "href": base_url}]
@@ -218,6 +216,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
 
         for aggregation in aggregations:
             if aggregation == "total_count":
+                response = self.client.post_search(SEARCH_INDEX_ID, search)
                 return {
                     "type": "AggregationCollection",
                     "aggregations": [
@@ -230,8 +229,13 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     "links": links,
                 }
             else:
-                facet = aggregation.lstrip("cmip6_").rstrip("_frequency")
-                search.add_facet(facet, field_name=f"properties.cmip6:{facet}", type="terms")
+                facet = aggregation.removeprefix("cmip6_").removesuffix("_frequency")
+                search.add_facet(
+                    facet,
+                    field_name=f"properties.cmip6:{facet}", 
+                    type="terms",
+                    size=size
+                )
 
         response = self.client.post_search(SEARCH_INDEX_ID, search)
 
@@ -251,7 +255,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     "buckets": stac_buckets
                 }
                 stac_aggregations.append(stac_aggregation)
-        
+
         return {
             "type": "AggregationCollection",
             "aggregations": stac_aggregations,
