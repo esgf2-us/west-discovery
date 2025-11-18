@@ -6,11 +6,10 @@ faceting capabilities, replacing ElasticSearch-based aggregations.
 """
 
 from typing import Any, Optional
-from urllib.parse import urlencode, urljoin
+from urllib.parse import urljoin
 
 import attrs
 import globus_sdk
-from fastapi import HTTPException
 from stac_fastapi.core.base_database_logic import BaseDatabaseLogic
 from stac_fastapi.core.session import Session
 from stac_fastapi.extensions.core.aggregation.client import BaseAggregationClient
@@ -18,7 +17,6 @@ from stac_fastapi.extensions.core.aggregation.types import AggregationCollection
 from starlette.requests import Request
 
 from stac_fastapi.globus_search.config import SEARCH_INDEX_ID, GlobusSearchSettings
-from stac_fastapi.globus_search.database_logic import cql_to_filter
 
 
 @attrs.define
