@@ -1,4 +1,5 @@
 from typing import Optional
+from urllib.parse import urlparse
 
 from fastapi import HTTPException
 from stac_fastapi.core.core import CoreClient
@@ -34,6 +35,17 @@ class GlobusSearchClient(CoreClient):
         )
 
         links = await PagingLinks(request=request, next=next_marker).get_links()
+
+        # Fix item hrefs to match request host
+        request_url_href = urlparse(str(request.url))
+        for item in items:
+            links = item.get("links", [])
+            for index, link in enumerate(links):
+                link_href = urlparse(str(link.get("href", "")))
+                if "localhost" in request_url_href.netloc:
+                    link_href = link_href._replace(scheme="http")
+                link_href = link_href._replace(netloc=request_url_href.netloc)
+                links[index]["href"] = link_href.geturl()
 
         return stac_types.ItemCollection(
             type="FeatureCollection",
