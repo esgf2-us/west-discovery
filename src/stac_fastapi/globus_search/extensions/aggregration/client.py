@@ -189,7 +189,13 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
         **kwargs,
     ) -> dict[str, Any]:
         request: Request = kwargs.get("request")
-        base_url = str(request.base_url) if request else ""
+        base_url = str(request.base_url)
+
+        if request.method == "POST":
+            request = await request.json()
+            # Expects the json body to have an "aggregations" list field
+            aggregations = request.get("aggregations", [])
+
         links = [{"rel": "root", "type": "application/json", "href": base_url}]
         stac_aggregations = []
 
