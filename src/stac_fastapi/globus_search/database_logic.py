@@ -9,6 +9,7 @@ import typing as t
 
 import attrs
 import globus_sdk
+from fastapi import HTTPException
 from stac_fastapi.core import serializers
 from starlette.requests import Request
 
@@ -233,7 +234,12 @@ class DatabaseLogic:
 
     async def find_collection(self, collection_id: str) -> dict:
         path = os.path.dirname(os.path.realpath(__file__))
-        f = open(path + f"/schemas/{collection_id.upper()}.json")
+        try:
+            f = open(path + f"/schemas/{collection_id}.json")
+        except FileNotFoundError:
+            raise HTTPException(
+                status_code=404,
+                detail="Collection not found. Collections are case sensitive.")
         data = json.load(f)
         return data
 
@@ -315,7 +321,6 @@ class DatabaseLogic:
 
         if token:
             search.set_marker(token)
-
         try:
             response = _client.scroll(SEARCH_INDEX_ID, search)
         except globus_sdk.SearchAPIError as e:

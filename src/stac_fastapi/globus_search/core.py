@@ -1,29 +1,33 @@
 from typing import Optional
+from urllib.parse import urlparse
 
+from fastapi import HTTPException
 from stac_fastapi.core.core import CoreClient
 from stac_fastapi.core.models.links import PagingLinks
 
 from stac_fastapi.types import stac as stac_types
-from stac_pydantic.shared import BBox
 
 
 class GlobusSearchClient(CoreClient):
     async def item_collection(
         self,
         collection_id: str,
-        bbox: Optional[BBox] = None,
-        datetime: Optional[str] = None,
         limit: Optional[int] = 10,
         token: Optional[str] = None,
-        filter_expr: Optional[str] = None,
         **kwargs,
     ) -> stac_types.ItemCollection:
 
         request = kwargs.get("request")
+        search = self.database.make_search()
         token = request.query_params.get("token", token)
 
+        if collection_id:
+            search = self.database.apply_collections_filter(
+                search=search, collection_ids=[collection_id]
+            )
+
         items, total, next_marker = await self.database.execute_search(
-            search=self.database.make_search(),
+            search=search,
             limit=limit,
             token=token,
             sort=None,
@@ -31,6 +35,17 @@ class GlobusSearchClient(CoreClient):
         )
 
         links = await PagingLinks(request=request, next=next_marker).get_links()
+
+        # Fix item hrefs to match request host
+        request_url_href = urlparse(str(request.url))
+        for item in items:
+            links = item.get("links", [])
+            for index, link in enumerate(links):
+                link_href = urlparse(str(link.get("href", "")))
+                if "localhost" in request_url_href.netloc:
+                    link_href = link_href._replace(scheme="http")
+                link_href = link_href._replace(netloc=request_url_href.netloc)
+                links[index]["href"] = link_href.geturl()
 
         return stac_types.ItemCollection(
             type="FeatureCollection",

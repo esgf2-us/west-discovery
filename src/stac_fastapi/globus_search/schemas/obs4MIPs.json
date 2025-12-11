@@ -7,12 +7,12 @@
   },
   "stac_version": "1.0.1",
   "license": "No license",
-  "description": "CMIP6",
+  "description": "obs4MIPS",
   "links": [
     {
       "rel": "items",
       "type": "application/geo+json",
-      "href": "https://data-challenge-06-discovery.api.stac.esgf-west.org/collections/CMIP6/items"
+      "href": "https://data-challenge-06-discovery.api.stac.esgf-west.org/collections/obs4MIPs/items"
     },
     {
       "rel": "parent",
@@ -27,10 +27,10 @@
     {
       "rel": "self",
       "type": "application/json",
-      "href": "https://data-challenge-06-discovery.api.stac.esgf-west.org/collections/CMIP6"
+      "href": "https://data-challenge-06-discovery.api.stac.esgf-west.org/collections/obs4MIPs"
     }
   ],
-  "id": "CMIP6",
+  "id": "obs4MIPS",
   "type": "Collection",
   "providers": [],
   "summaries": {},
