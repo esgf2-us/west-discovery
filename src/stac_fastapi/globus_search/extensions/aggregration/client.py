@@ -10,8 +10,11 @@ from urllib.parse import urljoin
 
 import attrs
 import globus_sdk
+from fastapi import HTTPException
+
 from stac_fastapi.core.base_database_logic import BaseDatabaseLogic
 from stac_fastapi.core.session import Session
+from stac_fastapi.core.extensions.aggregation import EsAggregationExtensionPostRequest
 from stac_fastapi.extensions.core.aggregation.client import BaseAggregationClient
 from stac_fastapi.extensions.core.aggregation.types import AggregationCollection
 from starlette.requests import Request
@@ -23,12 +26,13 @@ from stac_fastapi.globus_search.config import SEARCH_INDEX_ID, GlobusSearchSetti
 class GlobusSearchAggregationClient(BaseAggregationClient):
     """
     Aggregation client that uses Globus Search facets for STAC aggregations.
-    
+
     This client provides compatibility with the STAC aggregation extension
     by translating aggregation requests to Globus Search facet queries.
     """
+    client = globus_sdk.SearchClient()
     database: BaseDatabaseLogic = attrs.field()
-    session: Session = attrs.field() 
+    session: Session = attrs.field()
     settings: GlobusSearchSettings = attrs.field()
 
     CMIP6_DEFAULT_AGGREGATIONS = [
@@ -137,9 +141,6 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
     DEFAULT_AGGREGATIONS = [
         {"name": "total_count", "data_type": "integer"},
     ]
-    
-    def __init__(self, *args, **kwargs):
-        self.client = globus_sdk.SearchClient()
 
     async def get_aggregations(
         self, collection_id: Optional[str] = None, **kwargs
@@ -183,23 +184,58 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
 
     async def aggregate(
         self,
+        aggregate_request: Optional[EsAggregationExtensionPostRequest] = None,
         aggregations: Optional[str] = None,
+        collections: Optional[list] = [],
         collection_id: Optional[str] = None,
+        filter_expr: Optional[str] = None,
+        filter_lang: Optional[str] = None,
         size: Optional[int] = 10,
         **kwargs,
     ) -> dict[str, Any]:
         request: Request = kwargs.get("request")
         base_url = str(request.base_url)
+        path = request.url.path
 
-        if request.method == "POST":
-            request = await request.json()
-            # Expects the json body to have an "aggregations" list field
-            aggregations = request.get("aggregations", [])
+        search = globus_sdk.SearchQuery()
+
+        if aggregate_request:
+            if aggregate_request.filter_expr:
+                search = self.database.apply_cql2_filter(
+                    search,
+                    aggregate_request.filter_expr
+                )
+            aggregations = aggregate_request.aggregations
+            collections = aggregate_request.collections
+            size = aggregate_request.size
+
+            # Workaround for optional path param in POST requests
+            if "collections" in path and "{collection_id}" not in path:
+                collection_id = path.split("/")[2]
+
+        if collection_id:
+            if collections:
+                print(collections)
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot specify both 'collection_id' and 'collections' parameters.",
+                )
+            else:
+                collections = [collection_id]
+
+        search = self.database.apply_collections_filter(search, collections)
+
+        if (
+            aggregations is None or aggregations == []
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="No 'aggregations' found. Use '/aggregations' to return available aggregations",
+            )
 
         links = [{"rel": "root", "type": "application/json", "href": base_url}]
         stac_aggregations = []
 
-        search = globus_sdk.SearchQuery()
         search.set_query("*")
         search.set_limit(0)
 
@@ -238,11 +274,12 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                 facet = aggregation.removeprefix("cmip6_").removesuffix("_frequency")
                 search.add_facet(
                     facet,
-                    field_name=f"properties.cmip6:{facet}", 
+                    field_name=f"properties.cmip6:{facet}",
                     type="terms",
                     size=size
                 )
 
+        print(search)
         response = self.client.post_search(SEARCH_INDEX_ID, search)
 
         if response["facet_results"]:
