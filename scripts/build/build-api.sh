@@ -1,6 +1,6 @@
 #!/bin/bash
 
-API_IMAGE=data-challenge-agu-discovery:latest
+API_IMAGE=data-challenge-06-discovery:latest
 
 docker build --platform=linux/x86_64 -f ./Dockerfile -t $API_IMAGE .
 
