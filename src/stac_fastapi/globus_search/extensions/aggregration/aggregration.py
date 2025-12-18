@@ -11,10 +11,15 @@ from stac_fastapi.extensions.core.aggregation.request import (
     AggregationExtensionPostRequest,
 )
 
+from stac_fastapi.extensions.core.filter.request import (
+    FilterExtensionGetRequest,
+    FilterExtensionPostRequest,
+)
+
 
 @attr.s
 class GlobusAggregationExtensionGetRequest(
-    AggregationExtensionGetRequest
+    AggregationExtensionGetRequest, FilterExtensionGetRequest
 ):
     collection_id: Optional[
         Annotated[str, Path(description="Collection ID")]
@@ -25,6 +30,6 @@ class GlobusAggregationExtensionGetRequest(
 
 @attr.s
 class GlobusAggregationExtensionPostRequest(
-    AggregationExtensionPostRequest
+    AggregationExtensionPostRequest, FilterExtensionPostRequest
 ):
-    size : Optional[int] = attr.ib(default=10)
+    size : Optional[int] = 10

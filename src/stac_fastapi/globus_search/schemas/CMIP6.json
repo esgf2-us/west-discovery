@@ -12,22 +12,22 @@
     {
       "rel": "items",
       "type": "application/geo+json",
-      "href": "https://data-challenge-agu-discovery.api.stac.esgf-west.org/collections/CMIP6/items"
+      "href": "https://data-challenge-06-discovery.api.stac.esgf-west.org/collections/CMIP6/items"
     },
     {
       "rel": "parent",
       "type": "application/json",
-      "href": "https://data-challenge-agu-discovery.api.stac.esgf-west.org/collections"
+      "href": "https://data-challenge-06-discovery.api.stac.esgf-west.org/collections"
     },
     {
       "rel": "root",
       "type": "application/json",
-      "href": "https://data-challenge-agu-discovery.api.stac.esgf-west.org/"
+      "href": "https://data-challenge-06-discovery.api.stac.esgf-west.org/"
     },
     {
       "rel": "self",
       "type": "application/json",
-      "href": "https://data-challenge-agu-discovery.api.stac.esgf-west.org/collections/CMIP6"
+      "href": "https://data-challenge-06-discovery.api.stac.esgf-west.org/collections/CMIP6"
     }
   ],
   "id": "CMIP6",
