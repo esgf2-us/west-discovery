@@ -215,7 +215,6 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
 
         if collection_id:
             if collections:
-                print(collections)
                 raise HTTPException(
                     status_code=400,
                     detail="Cannot specify both 'collection_id' and 'collections' parameters.",
@@ -263,8 +262,8 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     "type": "AggregationCollection",
                     "aggregations": [
                         {
-                            "name": "total_count", 
-                            "data_type": "integer", 
+                            "name": "total_count",
+                            "data_type": "integer",
                             "value": response["total"]
                         }
                     ],
@@ -279,7 +278,6 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     size=size
                 )
 
-        print(search)
         response = self.client.post_search(SEARCH_INDEX_ID, search)
 
         if response["facet_results"]:
