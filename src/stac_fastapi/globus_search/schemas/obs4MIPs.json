@@ -7,7 +7,7 @@
   },
   "stac_version": "1.0.1",
   "license": "No license",
-  "description": "obs4MIPS",
+  "description": "obs4MIPs",
   "links": [
     {
       "rel": "items",
@@ -30,7 +30,7 @@
       "href": "https://data-challenge-06-discovery.api.stac.esgf-west.org/collections/obs4MIPs"
     }
   ],
-  "id": "obs4MIPS",
+  "id": "obs4MIPs",
   "type": "Collection",
   "providers": [],
   "summaries": {},

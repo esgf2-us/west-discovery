@@ -1,11 +1,11 @@
 [build-system]
-requires = ["poetry>=0.12"]
-build-backend = "poetry.masonry.api"
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
 name = "stac_fastapi.globus_search"
 version = "0.0.1"
-description = "A Globus Search stac-fastapi frontend demo"
+description = "A Globus Search stac-fastapi frontend"
 license = "Apache-2.0"
 authors = ["Stephen Rosen <sirosen@globus.org>"]
 packages = [
@@ -16,13 +16,13 @@ packages = [
 python = "^3.12.0"
 attrs = "25.3.0"
 globus-sdk = "3.62.0"
-hishel = "1.1.5"
-hishel-async = "1.1.5"
+hishel = {extras = ["async"], version = "1.1.5"}
 pystac-client = "0.7.0"
-stac-fastapi.api = "3.0.0a0"
-stac-fastapi.core = "3.0.0a1"
-stac-fastapi.extensions = "3.0.0a0"
-stac-fastapi.types = "3.0.0a0"
+sfeos-helpers = "6.3.0"
+"stac-fastapi.api" = "6.0.0"
+"stac-fastapi.extensions" = "6.0.0"
+"stac-fastapi.types" = "6.0.0"
+stac-fastapi-core = "6.3.0"
 uvicorn = "0.35.0"
 
 [tool.poetry.scripts]

@@ -303,6 +303,7 @@ class DatabaseLogic:
             search["filters"].append(cql_to_filter(filter_))
         return search
 
+    @property
     async def execute_search(
         self,
         search: globus_sdk.SearchQuery,
