@@ -95,8 +95,8 @@ class GlobusSearchClient(CoreClient):
             )
 
         # only cql2_json is supported here
-        if hasattr(search_request, "filter"):
-            cql2_filter = getattr(search_request, "filter", None)
+        if hasattr(search_request, "filter_expr"):
+            cql2_filter = getattr(search_request, "filter_expr", None)
             try:
                 search = self.database.apply_cql2_filter(search, cql2_filter)
             except Exception as e:
