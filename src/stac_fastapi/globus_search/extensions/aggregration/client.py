@@ -35,6 +35,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
     session: Session = attrs.field()
     settings: GlobusSearchSettings = attrs.field()
 
+    # All Default Aggregations for all collections
     CMIP6_DEFAULT_AGGREGATIONS = [
         {
             "frequency_distribution_data_type": "string",
@@ -137,6 +138,112 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
             "data_type": "frequency_distribution"
         }
     ]
+    CMIP7_DEFAULT_AGGREGATIONS = [
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_activity_id_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_cf_standard_name_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_data_specs_version_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_experiment_id_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_experiment_title_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_frequency_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_further_info_url_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_grid_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_grid_label_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_institution_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_institution_id_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_mip_era_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_nominal_resolution_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_source_id_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "array",
+            "name": "cmip7_source_type_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_sub_experiment_id_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_table_id_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_variable_id_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_variable_long_name_frequency",
+            "data_type": "frequency_distribution"
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip7_variant_label_frequency",
+            "data_type": "frequency_distribution"
+        }
+    ]
+    COLLECTION_DEFAULT_AGGREGATIONS = {
+        "CMIP6": CMIP6_DEFAULT_AGGREGATIONS,
+        "CMIP7": CMIP7_DEFAULT_AGGREGATIONS,
+    }
 
     DEFAULT_AGGREGATIONS = [
         {"name": "total_count", "data_type": "integer"},
@@ -165,7 +272,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     },
                 ]
             )
-            aggregations = self.CMIP6_DEFAULT_AGGREGATIONS.copy() + self.DEFAULT_AGGREGATIONS.copy()
+            aggregations = self.COLLECTION_DEFAULT_AGGREGATIONS[collection_id] + self.DEFAULT_AGGREGATIONS.copy()
         else:
             links.append(
                 {
@@ -270,10 +377,23 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     "links": links,
                 }
             else:
-                facet = aggregation.removeprefix("cmip6_").removesuffix("_frequency")
+
+                char, index = find_first_non_alphanumeric(aggregation)
+                if index != -1:
+                    project = aggregation[:index]
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Character separating project and field not found in aggregation string.",
+                    )
+
+                facet = aggregation.removeprefix(
+                    f"{project}{char}").removesuffix(
+                    f"{char}frequency")
+
                 search.add_facet(
                     facet,
-                    field_name=f"properties.cmip6:{facet}",
+                    field_name=f"properties.{project}:{facet}",
                     type="terms",
                     size=size
                 )
@@ -291,7 +411,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     }
                     stac_buckets.append(stac_bucket)
                 stac_aggregation = {
-                    "name": f"cmip6_{facet['name']}_frequency",
+                    "name": f"{project}{char}{facet['name']}{char}frequency",
                     "data_type": "frequency_distribution",
                     "buckets": stac_buckets
                 }
@@ -302,3 +422,11 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
             "aggregations": stac_aggregations,
             "links": links,
         }
+
+
+def find_first_non_alphanumeric(aggregation: str) -> tuple[Optional[str], int]:
+    """Find the first non-alphanumeric character in a string."""
+    for index, char in enumerate(aggregation):
+        if not char.isalnum():
+            return char, index
+    return None, -1

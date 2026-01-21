@@ -1,12 +1,12 @@
 {
     "containerDefinitions": [
         {
-            "name": "data-challenge-06-discovery",
-            "image": "730335463484.dkr.ecr.us-east-1.amazonaws.com/data-challenge-06-discovery",
+            "name": "<image-name>",
+            "image": "730335463484.dkr.ecr.us-east-1.amazonaws.com/<image-name>",
             "cpu": 0,
             "portMappings": [
                 {
-                    "name": "data-challenge-06-discovery-8000-tcp",
+                    "name": "<image-name>-8000-tcp",
                     "containerPort": 8000,
                     "hostPort": 8000,
                     "protocol": "tcp",
@@ -20,7 +20,7 @@
             "logConfiguration": {
                 "logDriver": "awslogs",
                 "options": {
-                    "awslogs-group": "/ecs/data-challenge-06-discovery",
+                    "awslogs-group": "/ecs/<image-name>",
                     "awslogs-create-group": "true",
                     "awslogs-region": "us-east-1",
                     "awslogs-stream-prefix": "ecs"
@@ -33,7 +33,7 @@
     "taskRoleArn": "arn:aws:iam::730335463484:role/ecsTaskExecutionRole",
     "executionRoleArn": "arn:aws:iam::730335463484:role/ecsTaskExecutionRole",
     "networkMode": "awsvpc",
-    "family": "data-challenge-06-discovery",
+    "family": "<image-name>",
     "volumes": [],
     "placementConstraints": [],
     "requiresCompatibilities": [
