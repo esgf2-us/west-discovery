@@ -3,6 +3,7 @@ name: Build and Push to ECR
 on:
   push:
     branches:
+      - add-ci-cd
       - integration
   pull_request:
     branches:
