@@ -1,10 +1,9 @@
 from .aggregration import (
     GlobusAggregationExtensionGetRequest,
-    GlobusAggregationExtensionPostRequest
+    GlobusAggregationExtensionPostRequest,
 )
-
 
 __all__ = [
     "GlobusAggregationExtensionGetRequest",
-    "GlobusAggregationExtensionPostRequest"
+    "GlobusAggregationExtensionPostRequest",
 ]

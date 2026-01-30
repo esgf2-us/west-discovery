@@ -3,29 +3,29 @@ This app definition is a fork of the one from the Mongo backend for
 stac-fastapi.
 """
 
-from hishel.fastapi import cache
-from hishel.asgi import ASGICacheMiddleware
 from hishel import AsyncSqliteStorage
-
+from hishel.asgi import ASGICacheMiddleware
+from hishel.fastapi import cache
 from stac_fastapi.api.app import StacApi
-from stac_fastapi.api.models import (create_get_request_model,
-                                     create_post_request_model)
+from stac_fastapi.api.models import create_get_request_model, create_post_request_model
 from stac_fastapi.core.session import Session
 from stac_fastapi.extensions.core import (
     AggregationExtension,
     FilterExtension,
-    TokenPaginationExtension
+    TokenPaginationExtension,
 )
+from stac_fastapi.sfeos_helpers.filter import EsAsyncBaseFiltersClient
+
 from stac_fastapi.globus_search.config import GlobusSearchSettings
 from stac_fastapi.globus_search.core import GlobusSearchClient
 from stac_fastapi.globus_search.database_logic import DatabaseLogic
 from stac_fastapi.globus_search.extensions.aggregration import (
     GlobusAggregationExtensionGetRequest,
-    GlobusAggregationExtensionPostRequest
+    GlobusAggregationExtensionPostRequest,
 )
-from stac_fastapi.globus_search.extensions.aggregration.client import GlobusSearchAggregationClient
-from stac_fastapi.sfeos_helpers.filter import EsAsyncBaseFiltersClient
-
+from stac_fastapi.globus_search.extensions.aggregration.client import (
+    GlobusSearchAggregationClient,
+)
 
 database_logic = DatabaseLogic()
 settings = GlobusSearchSettings()
@@ -59,7 +59,7 @@ extensions = [aggregation_extension] + search_extensions
 route_dependencies = [
     (
         [{"path": "/collections/{collection_id}/items", "method": "GET"}],
-        [cache(max_age=300, public=True)]
+        [cache(max_age=300, public=True)],
     )
 ]
 

@@ -239,7 +239,8 @@ class DatabaseLogic:
         except FileNotFoundError:
             raise HTTPException(
                 status_code=404,
-                detail="Collection not found. Collections are case sensitive.")
+                detail="Collection not found. Collections are case sensitive.",
+            )
         data = json.load(f)
         return data
 

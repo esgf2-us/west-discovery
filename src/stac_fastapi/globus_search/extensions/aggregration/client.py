@@ -11,10 +11,9 @@ from urllib.parse import urljoin
 import attrs
 import globus_sdk
 from fastapi import HTTPException
-
 from stac_fastapi.core.base_database_logic import BaseDatabaseLogic
-from stac_fastapi.core.session import Session
 from stac_fastapi.core.extensions.aggregation import EsAggregationExtensionPostRequest
+from stac_fastapi.core.session import Session
 from stac_fastapi.extensions.core.aggregation.client import BaseAggregationClient
 from stac_fastapi.extensions.core.aggregation.types import AggregationCollection
 from starlette.requests import Request
@@ -30,6 +29,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
     This client provides compatibility with the STAC aggregation extension
     by translating aggregation requests to Globus Search facet queries.
     """
+
     client = globus_sdk.SearchClient()
     database: BaseDatabaseLogic = attrs.field()
     session: Session = attrs.field()
@@ -40,205 +40,205 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_activity_id_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_cf_standard_name_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_data_specs_version_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_experiment_id_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_experiment_title_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_frequency_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_further_info_url_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_grid_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_grid_label_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_institution_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_institution_id_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_mip_era_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_nominal_resolution_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_source_id_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "array",
             "name": "cmip6_source_type_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_sub_experiment_id_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_table_id_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_variable_id_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_variable_long_name_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_variant_label_frequency",
-            "data_type": "frequency_distribution"
-        }
+            "data_type": "frequency_distribution",
+        },
     ]
     CMIP7_DEFAULT_AGGREGATIONS = [
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_activity_id_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_cf_standard_name_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_data_specs_version_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_experiment_id_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_experiment_title_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_frequency_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_further_info_url_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_grid_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_grid_label_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_institution_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_institution_id_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_mip_era_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_nominal_resolution_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_source_id_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "array",
             "name": "cmip7_source_type_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_sub_experiment_id_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_table_id_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_variable_id_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_variable_long_name_frequency",
-            "data_type": "frequency_distribution"
+            "data_type": "frequency_distribution",
         },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip7_variant_label_frequency",
-            "data_type": "frequency_distribution"
-        }
+            "data_type": "frequency_distribution",
+        },
     ]
     COLLECTION_DEFAULT_AGGREGATIONS = {
         "CMIP6": CMIP6_DEFAULT_AGGREGATIONS,
@@ -272,7 +272,10 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     },
                 ]
             )
-            aggregations = self.COLLECTION_DEFAULT_AGGREGATIONS[collection_id] + self.DEFAULT_AGGREGATIONS.copy()
+            aggregations = (
+                self.COLLECTION_DEFAULT_AGGREGATIONS[collection_id]
+                + self.DEFAULT_AGGREGATIONS.copy()
+            )
         else:
             links.append(
                 {
@@ -309,8 +312,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
         if aggregate_request:
             if aggregate_request.filter_expr:
                 search = self.database.apply_cql2_filter(
-                    search,
-                    aggregate_request.filter_expr
+                    search, aggregate_request.filter_expr
                 )
             aggregations = aggregate_request.aggregations
             collections = aggregate_request.collections
@@ -331,9 +333,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
 
         search = self.database.apply_collections_filter(search, collections)
 
-        if (
-            aggregations is None or aggregations == []
-        ):
+        if aggregations is None or aggregations == []:
             raise HTTPException(
                 status_code=400,
                 detail="No 'aggregations' found. Use '/aggregations' to return available aggregations",
@@ -371,7 +371,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                         {
                             "name": "total_count",
                             "data_type": "integer",
-                            "value": response["total"]
+                            "value": response["total"],
                         }
                     ],
                     "links": links,
@@ -387,15 +387,15 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                         detail="Character separating project and field not found in aggregation string.",
                     )
 
-                facet = aggregation.removeprefix(
-                    f"{project}{char}").removesuffix(
-                    f"{char}frequency")
+                facet = aggregation.removeprefix(f"{project}{char}").removesuffix(
+                    f"{char}frequency"
+                )
 
                 search.add_facet(
                     facet,
                     field_name=f"properties.{project}:{facet}",
                     type="terms",
-                    size=size
+                    size=size,
                 )
 
         response = self.client.post_search(SEARCH_INDEX_ID, search)
@@ -407,13 +407,13 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     stac_bucket = {
                         "key": bucket["value"],
                         "data_type": "frequency_distribution",
-                        "frequency": bucket["count"]
+                        "frequency": bucket["count"],
                     }
                     stac_buckets.append(stac_bucket)
                 stac_aggregation = {
                     "name": f"{project}{char}{facet['name']}{char}frequency",
                     "data_type": "frequency_distribution",
-                    "buckets": stac_buckets
+                    "buckets": stac_buckets,
                 }
                 stac_aggregations.append(stac_aggregation)
 
