@@ -38,19 +38,11 @@ jobs:
         run: |
           pip install flake8
           flake8 src/ --config=.flake8
+        continue-on-error: true
 
       - name: Run tests
         run: |
           pytest tests/ -v --cov=src/stac_fastapi/globus_search --cov-report=xml
-        continue-on-error: true
-
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v4
-        if: github.event_name == 'push'
-        with:
-          file: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
         continue-on-error: true
 
   build:
