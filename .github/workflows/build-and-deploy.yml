@@ -13,7 +13,7 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: west-discovery
-  CONTAINER_NAME: app
+  CONTAINER_NAME: west-discovery
   ECS_TASK_DEFINITION: ecs/task-definition.json
 
 permissions:

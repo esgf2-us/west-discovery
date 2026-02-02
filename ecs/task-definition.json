@@ -12,7 +12,7 @@
   "executionRoleArn": "arn:aws:iam::730335463484:role/ecsTaskExecutionRole",
   "containerDefinitions": [
     {
-      "name": "app",
+      "name": "west-discovery",
       "image": "REPLACED_BY_CI",
       "essential": true,
       "portMappings": [
