@@ -15,14 +15,15 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.12.0"
 attrs = "25.3.0"
-globus-sdk = "3.62.0"
-hishel = "1.1.5"
-hishel-async = "1.1.5"
-pystac-client = "0.7.0"
-stac-fastapi.api = "3.0.0a0"
-stac-fastapi.core = "3.0.0a1"
-stac-fastapi.extensions = "3.0.0a0"
-stac-fastapi.types = "3.0.0a0"
+fastapi = ">=0.68.0"
+globus_sdk = "3.62.0"
+hishel = { version = "1.1.5", extras = ["async"] }
+pystac_client = ">=0.7.0"
+sfeos-helpers = "6.3.0"
+stac-fastapi.api = "6.0.0"
+stac-fastapi.core = "6.3.0"
+stac-fastapi.extensions = "6.0.0"
+stac-fastapi.types = "6.0.0"
 uvicorn = "0.35.0"
 
 [tool.poetry.scripts]
