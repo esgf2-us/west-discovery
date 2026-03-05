@@ -4,7 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
 develop-eggs/
 dist/
 downloads/
@@ -49,10 +48,6 @@ htmlcov/
 .mypy_cache/
 .dmypy.json
 dmypy.json
-
-# Poetry
-poetry.lock
-poetry.toml
 
 # Jupyter Notebook
 .ipynb_checkpoints
