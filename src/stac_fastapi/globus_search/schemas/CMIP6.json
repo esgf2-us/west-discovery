@@ -8,28 +8,7 @@
   "stac_version": "1.0.1",
   "license": "No license",
   "description": "CMIP6",
-  "links": [
-    {
-      "rel": "items",
-      "type": "application/geo+json",
-      "href": "https://data-challenge-06-discovery.api.stac.esgf-west.org/collections/CMIP6/items"
-    },
-    {
-      "rel": "parent",
-      "type": "application/json",
-      "href": "https://data-challenge-06-discovery.api.stac.esgf-west.org/collections"
-    },
-    {
-      "rel": "root",
-      "type": "application/json",
-      "href": "https://data-challenge-06-discovery.api.stac.esgf-west.org/"
-    },
-    {
-      "rel": "self",
-      "type": "application/json",
-      "href": "https://data-challenge-06-discovery.api.stac.esgf-west.org/collections/CMIP6"
-    }
-  ],
+  "links": [],
   "id": "CMIP6",
   "type": "Collection",
   "providers": [],
