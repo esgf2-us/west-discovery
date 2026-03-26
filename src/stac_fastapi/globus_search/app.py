@@ -17,6 +17,7 @@ from stac_fastapi.extensions.core import (
     FreeTextExtension,
     TokenPaginationExtension
 )
+from stac_fastapi.extensions.core.free_text import FreeTextConformanceClasses
 from stac_fastapi.globus_search.config import GlobusSearchSettings
 from stac_fastapi.globus_search.core import GlobusSearchClient
 from stac_fastapi.globus_search.database_logic import DatabaseLogic
@@ -46,7 +47,9 @@ filter_extension = FilterExtension(
 filter_extension.conformance_classes.append(
     "http://www.opengis.net/spec/cql2/1.0/conf/advanced-comparison-operators"
 )
-free_text_extension = FreeTextExtension()
+free_text_extension = FreeTextExtension(
+    conformance_classes=[FreeTextConformanceClasses.SEARCH]
+)
 pagination_extension = TokenPaginationExtension()
 
 search_extensions = [

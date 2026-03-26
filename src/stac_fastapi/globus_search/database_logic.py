@@ -303,6 +303,30 @@ class DatabaseLogic:
             search["filters"].append(cql_to_filter(filter_))
         return search
 
+    @staticmethod
+    def apply_free_text_filter(
+        search: globus_sdk.SearchScrollQuery,
+        free_text_queries: list[str] | None,
+    ) -> globus_sdk.SearchScrollQuery:
+        """Translate a list of free-text terms into a Globus Search query string.
+
+        Terms are OR-joined so a result matching any term is returned, consistent
+        with the stac-fastapi free-text extension spec. For field-scoped search
+        the Globus Lucene syntax can be used directly via FreeTextAdvancedExtension.
+
+        Args:
+            search: The Globus SearchScrollQuery to modify.
+            free_text_queries: Terms from the `q` request parameter, or None.
+
+        Returns:
+            The modified search object, or the original if no queries provided.
+        """
+        if not free_text_queries:
+            return search
+        query_string = " OR ".join(free_text_queries)
+        search.set_query(query_string)
+        return search
+
     async def execute_search(
         self,
         search: globus_sdk.SearchQuery,
@@ -314,7 +338,7 @@ class DatabaseLogic:
     ) -> tuple[t.Iterable[dict[str, t.Any]], int | None, str | None]:
         filters = search.get("filters", ())
 
-        if len(filters) == 0:
+        if len(filters) == 0 and not search.get("q"):
             search.set_query("*")
 
         search.set_limit(limit)

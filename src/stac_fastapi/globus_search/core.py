@@ -105,6 +105,23 @@ class GlobusSearchClient(CoreClient):
                     status_code=400, detail=f"Error with cql2_json filter: {e}"
                 )
 
+        # Free-text filter
+        if hasattr(search_request, "q"):
+            free_text_queries = getattr(search_request, "q", None)
+            # Normalise: advanced extension delivers a raw string, basic delivers a list
+            if isinstance(free_text_queries, str):
+                free_text_queries = [t.strip() for t in free_text_queries.split(",")]
+            if free_text_queries:
+                try:
+                    search = self.database.apply_free_text_filter(
+                        search,
+                        free_text_queries
+                    )
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=400, detail=f"Error with free-text query: {e}"
+                    )
+
         # Extract pagination parameters
         limit = getattr(search_request, "limit", 10)
         token = getattr(search_request, "token", None)
