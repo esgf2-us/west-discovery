@@ -1,7 +1,5 @@
 #!/bin/bash
 
-API_IMAGE=<image-name>:latest
-
 docker build --platform=linux/x86_64 -f ./Dockerfile -t $API_IMAGE .
 
 # Uncomment below to push image to ECR in AWS

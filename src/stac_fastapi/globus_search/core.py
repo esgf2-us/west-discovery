@@ -41,11 +41,12 @@ class GlobusSearchClient(CoreClient):
         for item in items:
             links = item.get("links", [])
             for index, link in enumerate(links):
-                link_href = urlparse(str(link.get("href", "")))
-                if "localhost" in request_url_href.netloc:
-                    link_href = link_href._replace(scheme="http")
-                link_href = link_href._replace(netloc=request_url_href.netloc)
-                links[index]["href"] = link_href.geturl()
+                if (type(link) is dict):
+                    link_href = urlparse(str(link.get("href", "")))
+                    if "localhost" in request_url_href.netloc:
+                        link_href = link_href._replace(scheme="http")
+                    link_href = link_href._replace(netloc=request_url_href.netloc)
+                    links[index]["href"] = link_href.geturl()
 
         return stac_types.ItemCollection(
             type="FeatureCollection",
