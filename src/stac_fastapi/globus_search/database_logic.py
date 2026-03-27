@@ -15,6 +15,7 @@ from starlette.requests import Request
 
 from .config import SEARCH_INDEX_ID, GlobusSearchSettings
 from .convert import search_doc_to_stac_item
+from .utility import build_stac_collection
 
 _client: globus_sdk.SearchClient = GlobusSearchSettings().create_client
 
@@ -233,15 +234,18 @@ class DatabaseLogic:
     )
 
     async def find_collection(self, collection_id: str) -> dict:
-        path = os.path.dirname(os.path.realpath(__file__))
-        try:
-            f = open(path + f"/schemas/{collection_id}.json")
-        except FileNotFoundError:
-            raise HTTPException(
-                status_code=404,
-                detail="Collection not found. Collections are case sensitive.")
-        data = json.load(f)
-        return data
+        collection = build_stac_collection(collection_id.lower())
+        return collection
+
+        # path = os.path.dirname(os.path.realpath(__file__))
+        # try:
+        #     f = open(path + f"/schemas/{collection_id}.json")
+        # except FileNotFoundError:
+        #     raise HTTPException(
+        #         status_code=404,
+        #         detail="Collection not found. Collections are case sensitive.")
+        # data = json.load(f)
+        # return data
 
     async def get_all_collections(
         self, token: str | None, limit: int, request: Request
