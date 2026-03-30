@@ -234,18 +234,7 @@ class DatabaseLogic:
     )
 
     async def find_collection(self, collection_id: str) -> dict:
-        collection = build_stac_collection(collection_id.lower())
-        return collection
-
-        # path = os.path.dirname(os.path.realpath(__file__))
-        # try:
-        #     f = open(path + f"/schemas/{collection_id}.json")
-        # except FileNotFoundError:
-        #     raise HTTPException(
-        #         status_code=404,
-        #         detail="Collection not found. Collections are case sensitive.")
-        # data = json.load(f)
-        # return data
+        return build_stac_collection(collection_id.lower())
 
     async def get_all_collections(
         self, token: str | None, limit: int, request: Request
