@@ -21,8 +21,16 @@ class GlobusSearchClient(CoreClient):
         # the case of the request
         for link in collection["links"]:
             if collection_id.lower() in link["href"]:
+                if collection_id.lower() == "obs4ref":
+                    new_collection_id = "obs4REF"
+                elif collection_id.lower() == "obs4mips":
+                    new_collection_id = "obs4MIPS"
+                elif collection_id.lower() == "cmip6plus":
+                    new_collection_id = "CMIP6Plus"
+                else:
+                    new_collection_id = collection_id.upper()
                 link["href"] = link["href"].replace(
-                    collection_id.lower(), collection_id.upper()
+                    collection_id.lower(), new_collection_id
                 )
         return collection
 
