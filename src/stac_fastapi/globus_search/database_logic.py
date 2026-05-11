@@ -15,7 +15,7 @@ from starlette.requests import Request
 
 from .config import SEARCH_INDEX_ID, GlobusSearchSettings
 from .convert import search_doc_to_stac_item
-from .utility import build_stac_collection
+from .utility import get_project, list_projects
 
 _client: globus_sdk.SearchClient = GlobusSearchSettings().create_client
 
@@ -234,17 +234,12 @@ class DatabaseLogic:
     )
 
     async def find_collection(self, collection_id: str) -> dict:
-        return build_stac_collection(collection_id.lower())
+        return get_project(collection_id)
 
     async def get_all_collections(
         self, token: str | None, limit: int, request: Request
     ) -> tuple[list[dict[str, t.Any]], str | None]:
-        collections = []
-        path = os.path.dirname(os.path.realpath(__file__)) + "/schemas"
-        for filename in os.listdir(path):
-            f = open(path + f"/{filename}")
-            collections.append(json.load(f))
-        return collections, None
+        return list_projects()
 
     async def get_one_item(self, collection_id: str, item_id: str) -> dict:
         res = _client.get_subject(SEARCH_INDEX_ID, item_id)

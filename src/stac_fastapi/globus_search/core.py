@@ -9,6 +9,23 @@ from stac_fastapi.types import stac as stac_types
 
 
 class GlobusSearchClient(CoreClient):
+    async def get_collection(
+        self, collection_id: str, **kwargs
+    ) -> stac_types.Collection:
+        collection = await super().get_collection(
+            collection_id=collection_id, **kwargs
+        )
+        # Need to figure out a better way to do this — 
+        # the collection_id is embedded in the hrefs of 
+        # all links, so we need to update them to match 
+        # the case of the request
+        for link in collection["links"]:
+            if collection_id.lower() in link["href"]:
+                link["href"] = link["href"].replace(
+                    collection_id.lower(), collection_id.upper()
+                )
+        return collection
+
     async def item_collection(
         self,
         collection_id: str,
