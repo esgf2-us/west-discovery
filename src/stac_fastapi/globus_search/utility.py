@@ -23,10 +23,7 @@ def _extract_summaries_from_schema(schema: dict) -> dict:
 
     # ── Correct path: definitions → item_fields → properties ─────────────────
     item_properties = (
-        schema
-        .get("definitions", {})
-        .get("item_fields", {})
-        .get("properties", {})
+        schema.get("definitions", {}).get("item_fields", {}).get("properties", {})
     )
 
     for field_name, field_schema in item_properties.items():
@@ -69,7 +66,7 @@ def get_project(project_id: str = "cmip6") -> dict:
 
     # In 4.0.0 ProjectSpecs carries an explicit project_id field
     canonical_id = specs.project_id  # e.g. "cmip6"
-    drs_name = specs.drs_name        # e.g. "CMIP6"
+    drs_name = specs.drs_name  # e.g. "CMIP6"
     cat = specs.catalog_specs.catalog_properties
 
     # ── 2. Generate JSON Schema → extract summaries ───────────────────────────
@@ -85,25 +82,28 @@ def get_project(project_id: str = "cmip6") -> dict:
         template = drs.separator.join(
             f"{{{p.source_collection}}}" for p in drs.parts if p.is_required
         )
-        links.append({
-            "rel": "describedby",
-            "href": f"https://github.com/WCRP-CMIP/CMIP6_CVs",
-            "type": "text/html",
-            "title": f"{drs_name} CV — dataset_id template: {template}"
-        })
+        links.append(
+            {
+                "rel": "describedby",
+                "href": f"https://github.com/WCRP-CMIP/CMIP6_CVs",
+                "type": "text/html",
+                "title": f"{drs_name} CV — dataset_id template: {template}",
+            }
+        )
 
     # STAC extension schema links from catalog_properties
     for ext in cat.extensions:
         url = cat.url_template.format(
-            extension_name=ext.name,
-            extension_version=ext.version
+            extension_name=ext.name, extension_version=ext.version
         )
-        links.append({
-            "rel": "describedby",
-            "href": url,
-            "type": "application/schema+json",
-            "title": f"STAC {ext.name} extension schema {ext.version}"
-        })
+        links.append(
+            {
+                "rel": "describedby",
+                "href": url,
+                "type": "application/schema+json",
+                "title": f"STAC {ext.name} extension schema {ext.version}",
+            }
+        )
 
     # ── 4. item_assets: file-level schema now available via file_properties ───
     # 4.0.0 exposes catalog_specs.file_properties for asset field constraints.
@@ -113,7 +113,7 @@ def get_project(project_id: str = "cmip6") -> dict:
         "data": {
             "type": "application/netcdf",
             "roles": ["data"],
-            "title": "NetCDF data file"
+            "title": "NetCDF data file",
         }
     }
 
@@ -124,11 +124,13 @@ def get_project(project_id: str = "cmip6") -> dict:
         "id": canonical_id,
         "title": drs_name,
         "description": specs.description,
-        "version": specs.version,                # CV git hash
+        "version": specs.version,  # CV git hash
         "license": "CC-BY-4.0",
         "extent": {
             "spatial": {"bbox": [[-180.0, -90.0, 180.0, 90.0]]},
-            "temporal": {"interval": [["0850-01-01T00:00:00Z", "2300-12-31T00:00:00Z"]]}
+            "temporal": {
+                "interval": [["0850-01-01T00:00:00Z", "2300-12-31T00:00:00Z"]]
+            },
         },
         "summaries": summaries,
         "item_assets": item_assets,

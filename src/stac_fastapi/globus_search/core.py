@@ -11,12 +11,10 @@ class GlobusSearchClient(CoreClient):
     async def get_collection(
         self, collection_id: str, **kwargs
     ) -> stac_types.Collection:
-        collection = await super().get_collection(
-            collection_id=collection_id, **kwargs
-        )
-        # Need to figure out a better way to do this — 
-        # the collection_id is embedded in the hrefs of 
-        # all links, so we need to update them to match 
+        collection = await super().get_collection(collection_id=collection_id, **kwargs)
+        # Need to figure out a better way to do this —
+        # the collection_id is embedded in the hrefs of
+        # all links, so we need to update them to match
         # the case of the request
         for link in collection["links"]:
             if collection_id.lower() in link["href"]:
@@ -65,7 +63,7 @@ class GlobusSearchClient(CoreClient):
         for item in items:
             links = item.get("links", [])
             for index, link in enumerate(links):
-                if (type(link) is dict):
+                if type(link) is dict:
                     link_href = urlparse(str(link.get("href", "")))
                     if "localhost" in request_url_href.netloc:
                         link_href = link_href._replace(scheme="http")
@@ -138,8 +136,7 @@ class GlobusSearchClient(CoreClient):
             if free_text_queries:
                 try:
                     search = self.database.apply_free_text_filter(
-                        search,
-                        free_text_queries
+                        search, free_text_queries
                     )
                 except Exception as e:
                     raise HTTPException(

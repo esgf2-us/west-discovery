@@ -29,7 +29,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+
 settings = Settings()
+
 
 class GlobusSearchSettings(ApiSettings):
     @property
