@@ -5,6 +5,8 @@ globus_sdk==3.62.0
 hishel==1.2.1
 hishel[async]==1.2.1
 pystac_client>=0.7.0
+pydantic==2.10.1
+pydantic-settings==2.10.1
 sfeos-helpers==6.3.0
 stac-fastapi.api==6.0.0
 stac-fastapi.core==6.3.0

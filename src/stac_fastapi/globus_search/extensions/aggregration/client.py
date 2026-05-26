@@ -11,15 +11,17 @@ from urllib.parse import urljoin
 import attrs
 import globus_sdk
 from fastapi import HTTPException
-
 from stac_fastapi.core.base_database_logic import BaseDatabaseLogic
+from stac_fastapi.core.extensions.aggregation import \
+    EsAggregationExtensionPostRequest
 from stac_fastapi.core.session import Session
-from stac_fastapi.core.extensions.aggregation import EsAggregationExtensionPostRequest
-from stac_fastapi.extensions.core.aggregation.client import BaseAggregationClient
-from stac_fastapi.extensions.core.aggregation.types import AggregationCollection
+from stac_fastapi.extensions.core.aggregation.client import \
+    BaseAggregationClient
+from stac_fastapi.extensions.core.aggregation.types import \
+    AggregationCollection
 from starlette.requests import Request
 
-from stac_fastapi.globus_search.config import SEARCH_INDEX_ID, GlobusSearchSettings
+from stac_fastapi.globus_search.config import settings
 
 
 @attrs.define
@@ -30,13 +32,17 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
     This client provides compatibility with the STAC aggregation extension
     by translating aggregation requests to Globus Search facet queries.
     """
-    client = globus_sdk.SearchClient()
+    client = settings.search_client
     database: BaseDatabaseLogic = attrs.field()
     session: Session = attrs.field()
-    settings: GlobusSearchSettings = attrs.field()
 
     # All Default Aggregations for all collections
     CMIP6_DEFAULT_AGGREGATIONS = [
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6_alternate_name_frequency",
+            "data_type": "frequency_distribution"
+        },
         {
             "frequency_distribution_data_type": "string",
             "name": "cmip6_activity_id_frequency",
@@ -244,7 +250,6 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
         "CMIP6": CMIP6_DEFAULT_AGGREGATIONS,
         "CMIP7": CMIP7_DEFAULT_AGGREGATIONS,
     }
-
     DEFAULT_AGGREGATIONS = [
         {"name": "total_count", "data_type": "integer"},
     ]
@@ -364,7 +369,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
 
         for aggregation in aggregations:
             if aggregation == "total_count":
-                response = self.client.post_search(SEARCH_INDEX_ID, search)
+                response = self.client.post_search(settings.search_index_id, search)
                 return {
                     "type": "AggregationCollection",
                     "aggregations": [
@@ -398,7 +403,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     size=size
                 )
 
-        response = self.client.post_search(SEARCH_INDEX_ID, search)
+        response = self.client.post_search(settings.search_index_id, search)
 
         if response["facet_results"]:
             for facet in response["facet_results"]:

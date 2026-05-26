@@ -1,8 +1,5 @@
-from .aggregration import (
-    GlobusAggregationExtensionGetRequest,
-    GlobusAggregationExtensionPostRequest
-)
-
+from .aggregration import (GlobusAggregationExtensionGetRequest,
+                           GlobusAggregationExtensionPostRequest)
 
 __all__ = [
     "GlobusAggregationExtensionGetRequest",

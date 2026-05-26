@@ -4,7 +4,6 @@ from urllib.parse import urlparse
 from fastapi import HTTPException
 from stac_fastapi.core.core import CoreClient
 from stac_fastapi.core.models.links import PagingLinks
-
 from stac_fastapi.types import stac as stac_types
 
 

@@ -1,4 +1,5 @@
 import json
+
 import esgvoc.api.projects as ev
 from esgvoc.api.project_specs import DrsType
 from esgvoc.apps.jsg.json_schema_generator import generate_json_schema

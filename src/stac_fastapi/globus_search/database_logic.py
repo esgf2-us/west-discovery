@@ -13,11 +13,11 @@ from fastapi import HTTPException
 from stac_fastapi.core import serializers
 from starlette.requests import Request
 
-from .config import SEARCH_INDEX_ID, GlobusSearchSettings
+from .config import settings
 from .convert import search_doc_to_stac_item
 from .utility import get_project, list_projects
 
-_client: globus_sdk.SearchClient = GlobusSearchSettings().create_client
+_client = settings.search_client
 
 
 def cql_translate_fieldname(fieldname: str) -> str:
@@ -242,7 +242,7 @@ class DatabaseLogic:
         return list_projects()
 
     async def get_one_item(self, collection_id: str, item_id: str) -> dict:
-        res = _client.get_subject(SEARCH_INDEX_ID, item_id)
+        res = _client.get_subject(settings.search_index_id, item_id)
         return search_doc_to_stac_item(res.data)
 
     @staticmethod
@@ -334,7 +334,7 @@ class DatabaseLogic:
         if token:
             search.set_marker(token)
         try:
-            response = _client.scroll(SEARCH_INDEX_ID, search)
+            response = _client.scroll(settings.search_index_id, search)
         except globus_sdk.SearchAPIError as e:
             print("SearchAPIError:")
             print(e.text)

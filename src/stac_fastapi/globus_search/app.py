@@ -3,39 +3,35 @@ This app definition is a fork of the one from the Mongo backend for
 stac-fastapi.
 """
 
-from hishel.fastapi import cache
-from hishel.asgi import ASGICacheMiddleware
 from hishel import AsyncSqliteStorage
-
+from hishel.asgi import ASGICacheMiddleware
+from hishel.fastapi import cache
 from stac_fastapi.api.app import StacApi
 from stac_fastapi.api.models import (create_get_request_model,
                                      create_post_request_model)
 from stac_fastapi.core.session import Session
-from stac_fastapi.extensions.core import (
-    AggregationExtension,
-    FilterExtension,
-    FreeTextExtension,
-    TokenPaginationExtension
-)
+from stac_fastapi.extensions.core import (AggregationExtension,
+                                          FilterExtension, FreeTextExtension,
+                                          TokenPaginationExtension)
 from stac_fastapi.extensions.core.free_text import FreeTextConformanceClasses
-from stac_fastapi.globus_search.config import GlobusSearchSettings
+from stac_fastapi.sfeos_helpers.filter import EsAsyncBaseFiltersClient
+from stac_fastapi.types.config import ApiSettings
+
+from stac_fastapi.globus_search.config import settings
 from stac_fastapi.globus_search.core import GlobusSearchClient
 from stac_fastapi.globus_search.database_logic import DatabaseLogic
 from stac_fastapi.globus_search.extensions.aggregration import (
     GlobusAggregationExtensionGetRequest,
-    GlobusAggregationExtensionPostRequest
-)
-from stac_fastapi.globus_search.extensions.aggregration.client import GlobusSearchAggregationClient
-from stac_fastapi.sfeos_helpers.filter import EsAsyncBaseFiltersClient
-
+    GlobusAggregationExtensionPostRequest)
+from stac_fastapi.globus_search.extensions.aggregration.client import \
+    GlobusSearchAggregationClient
 
 database_logic = DatabaseLogic()
-settings = GlobusSearchSettings()
-session = Session.create_from_settings(settings)
+session = Session.create_from_settings(ApiSettings())
 
 aggregation_extension = AggregationExtension(
     client=GlobusSearchAggregationClient(
-        database=database_logic, session=session, settings=settings
+        database=database_logic, session=session
     )
 )
 aggregation_extension.POST = GlobusAggregationExtensionPostRequest
@@ -70,7 +66,7 @@ route_dependencies = [
 ]
 
 api = StacApi(
-    settings=settings,
+    settings=ApiSettings(),
     extensions=extensions,
     client=GlobusSearchClient(
         database=database_logic, session=session, post_request_model=post_request_model
