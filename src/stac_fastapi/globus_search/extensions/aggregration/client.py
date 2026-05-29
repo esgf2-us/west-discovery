@@ -142,6 +142,215 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
             "data_type": "frequency_distribution",
         },
     ]
+    CMIP6PLUS_DEFAULT_AGGREGATIONS = [
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_alternate_name_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_activity_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_cf_standard_name_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_data_specs_version_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_experiment_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_experiment_title_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_frequency_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_further_info_url_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_grid_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_grid_label_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_institution_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_institution_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_mip_era_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_nominal_resolution_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_source_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "array",
+            "name": "cmip6plus_source_type_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_sub_experiment_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_table_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_variable_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_variable_long_name_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cmip6plus_variant_label_frequency",
+            "data_type": "frequency_distribution",
+        },
+    ]
+    CORDEX_CMIP6_DEFAULT_AGGREGATIONS = [
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_activity_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_cf_standard_name_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_data_specs_version_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_experiment_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_experiment_title_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_frequency_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_further_info_url_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_grid_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_grid_label_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_institution_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_institution_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_mip_era_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_nominal_resolution_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_source_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "array",
+            "name": "cordex_cmip6_source_type_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_sub_experiment_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_table_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_variable_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_variable_long_name_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "cordex_cmip6_variant_label_frequency",
+            "data_type": "frequency_distribution",
+        },
+    ]
     CMIP7_DEFAULT_AGGREGATIONS = [
         {
             "frequency_distribution_data_type": "string",
@@ -244,9 +453,114 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
             "data_type": "frequency_distribution",
         },
     ]
+    OBS4REF_DEFAULT_AGGREGATIONS = [
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_activity_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_cf_standard_name_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_data_specs_version_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_experiment_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_experiment_title_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_frequency_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_further_info_url_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_grid_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_grid_label_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_institution_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_institution_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_mip_era_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_nominal_resolution_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_source_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "array",
+            "name": "obs4ref_source_type_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_sub_experiment_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_table_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_variable_id_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_variable_long_name_frequency",
+            "data_type": "frequency_distribution",
+        },
+        {
+            "frequency_distribution_data_type": "string",
+            "name": "obs4ref_variant_label_frequency",
+            "data_type": "frequency_distribution",
+        },
+    ]
+    
     COLLECTION_DEFAULT_AGGREGATIONS = {
         "CMIP6": CMIP6_DEFAULT_AGGREGATIONS,
         "CMIP7": CMIP7_DEFAULT_AGGREGATIONS,
+        "CORDEX-CMIP6": CORDEX_CMIP6_DEFAULT_AGGREGATIONS,
+        "obs4REF": OBS4REF_DEFAULT_AGGREGATIONS,
     }
     DEFAULT_AGGREGATIONS = [
         {"name": "total_count", "data_type": "integer"},
