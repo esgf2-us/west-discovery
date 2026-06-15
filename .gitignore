@@ -43,6 +43,7 @@ ENV/
 htmlcov/
 .tox/
 .hypothesis/
+reports/
 
 # Type checking
 .mypy_cache/
