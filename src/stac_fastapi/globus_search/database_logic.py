@@ -3,14 +3,13 @@ This definition is a fork of the one from the Mongo backend for
 stac-fastapi, modified to work on Globus Search.
 """
 
-import json
-import os
 import typing as t
 
 import attrs
 import globus_sdk
 from fastapi import HTTPException
 from stac_fastapi.core import serializers
+from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 
 from .config import settings
@@ -242,7 +241,9 @@ class DatabaseLogic:
         return list_projects()
 
     async def get_one_item(self, collection_id: str, item_id: str) -> dict:
-        res = _client.get_subject(settings.search_index_id, item_id)
+        res = await run_in_threadpool(
+            _client.get_subject, settings.search_index_id, item_id
+        )
         return search_doc_to_stac_item(res.data)
 
     @staticmethod
@@ -334,7 +335,9 @@ class DatabaseLogic:
         if token:
             search.set_marker(token)
         try:
-            response = _client.scroll(settings.search_index_id, search)
+            response = await run_in_threadpool(
+                _client.scroll, settings.search_index_id, search
+            )
         except globus_sdk.SearchAPIError as e:
             print("SearchAPIError:")
             print(e.text)

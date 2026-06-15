@@ -3,6 +3,8 @@ This app definition is a fork of the one from the Mongo backend for
 stac-fastapi.
 """
 
+import os
+
 from hishel import AsyncSqliteStorage
 from hishel.asgi import ASGICacheMiddleware
 from hishel.fastapi import cache
@@ -79,7 +81,7 @@ api = StacApi(
 )
 handler = ASGICacheMiddleware(
     api.app,
-    storage=AsyncSqliteStorage(database_path="cache/hishel_cache.db"),
+    storage=AsyncSqliteStorage(database_path=f"/tmp/hishel_cache_{os.getpid()}.db"),
 )
 
 
