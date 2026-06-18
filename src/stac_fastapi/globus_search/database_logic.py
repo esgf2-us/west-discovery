@@ -233,12 +233,12 @@ class DatabaseLogic:
     )
 
     async def find_collection(self, collection_id: str) -> dict:
-        return get_project(collection_id)
+        return await run_in_threadpool(get_project, collection_id)
 
     async def get_all_collections(
         self, token: str | None, limit: int, request: Request
     ) -> tuple[list[dict[str, t.Any]], str | None]:
-        return list_projects()
+        return await run_in_threadpool(list_projects)
 
     async def get_one_item(self, collection_id: str, item_id: str) -> dict:
         res = await run_in_threadpool(
