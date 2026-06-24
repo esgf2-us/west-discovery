@@ -332,6 +332,58 @@ def test_apply_free_text_filter_leaves_search_unchanged_without_queries(
     assert search == {}
 
 
+def test_find_collection_returns_project(monkeypatch):
+    monkeypatch.setattr(
+        database_logic,
+        "get_project",
+        lambda collection_id: {"id": collection_id},
+    )
+
+    result = asyncio.run(DatabaseLogic().find_collection("CMIP6"))
+
+    assert result == {"id": "CMIP6"}
+
+
+def test_get_all_collections_returns_projects(monkeypatch):
+    monkeypatch.setattr(
+        database_logic,
+        "list_projects",
+        lambda: ([{"id": "CMIP6"}], None),
+    )
+
+    result = asyncio.run(
+        DatabaseLogic().get_all_collections(token=None, limit=10, request=None)
+    )
+
+    assert result == ([{"id": "CMIP6"}], None)
+
+
+def test_get_one_item_fetches_subject_and_converts_result(monkeypatch):
+    class FakeResponse:
+        data = {"subject": "item-1"}
+
+    class FakeClient:
+        def get_subject(self, index_id, item_id):
+            assert index_id == "test-search-index"
+            assert item_id == "item-1"
+            return FakeResponse()
+
+    monkeypatch.setattr(database_logic, "_client", FakeClient())
+    monkeypatch.setattr(
+        database_logic,
+        "search_doc_to_stac_item",
+        lambda doc: {"id": doc["subject"]},
+    )
+
+    result = asyncio.run(DatabaseLogic().get_one_item("CMIP6", "item-1"))
+
+    assert result == {"id": "item-1"}
+
+
+def test_make_search_returns_search_scroll_query():
+    assert isinstance(DatabaseLogic.make_search(), globus_sdk.SearchScrollQuery)
+
+
 def test_execute_search_sets_defaults_and_converts_results(monkeypatch):
     class FakeClient:
         def scroll(self, index_id, search):
@@ -362,6 +414,51 @@ def test_execute_search_sets_defaults_and_converts_results(monkeypatch):
     )
 
     assert result == ([{"id": "doc-1"}, {"id": "doc-2"}], 20, "next-marker")
+
+
+def test_execute_search_preserves_existing_query(monkeypatch):
+    class FakeClient:
+        def scroll(self, index_id, search):
+            assert search["q"] == "tas"
+            return {"gmeta": [], "total": 0, "marker": None}
+
+    monkeypatch.setattr(database_logic, "_client", FakeClient())
+
+    result = asyncio.run(
+        DatabaseLogic().execute_search(
+            search=globus_sdk.SearchScrollQuery(q="tas"),
+            limit=10,
+            token=None,
+            sort=None,
+            collection_ids=None,
+        )
+    )
+
+    assert result == ([], 0, None)
+
+
+def test_execute_search_does_not_set_default_query_when_filters_exist(monkeypatch):
+    class FakeClient:
+        def scroll(self, index_id, search):
+            assert "q" not in search
+            assert search["filters"] == [{"type": "exists", "field_name": "id"}]
+            return {"gmeta": [], "total": 0, "marker": None}
+
+    search = globus_sdk.SearchScrollQuery()
+    search["filters"] = [{"type": "exists", "field_name": "id"}]
+    monkeypatch.setattr(database_logic, "_client", FakeClient())
+
+    result = asyncio.run(
+        DatabaseLogic().execute_search(
+            search=search,
+            limit=10,
+            token=None,
+            sort=None,
+            collection_ids=None,
+        )
+    )
+
+    assert result == ([], 0, None)
 
 
 def test_execute_search_sets_pagination_token(monkeypatch):
