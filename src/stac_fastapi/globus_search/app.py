@@ -81,7 +81,7 @@ api = StacApi(
 )
 handler = ASGICacheMiddleware(
     api.app,
-    storage=AsyncSqliteStorage(database_path=f"/tmp/hishel_cache_{os.getpid()}.db"),
+    storage=AsyncSqliteStorage(database_path=f"/tmp/hishel_cache.db"),
 )
 
 
