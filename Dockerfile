@@ -29,7 +29,7 @@ RUN esgvoc use cmip6@latest \
 COPY ./src/stac_fastapi /var/task/stac_fastapi
 
 CMD ["uvicorn", "stac_fastapi.globus_search.app:handler", \
-     "--host", "0.0.0.0", "--port", "8000", \
+     "--host", "0.0.0.0", "--port", "8000",
      "--forwarded-allow-ips", "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16", \
      "--ssl-keyfile", "/etc/ssl/discovery/server.key", \
      "--ssl-certfile", "/etc/ssl/discovery/server.crt"]

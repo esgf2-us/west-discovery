@@ -16,6 +16,7 @@ from stac_fastapi.core.extensions.aggregation import EsAggregationExtensionPostR
 from stac_fastapi.core.session import Session
 from stac_fastapi.extensions.core.aggregation.client import BaseAggregationClient
 from stac_fastapi.extensions.core.aggregation.types import AggregationCollection
+from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 
 from stac_fastapi.globus_search.config import settings
@@ -681,7 +682,9 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
 
         for aggregation in aggregations:
             if aggregation == "total_count":
-                response = self.client.post_search(settings.search_index_id, search)
+                response = await run_in_threadpool(
+                    self.client.post_search, settings.search_index_id, search
+                )
                 return {
                     "type": "AggregationCollection",
                     "aggregations": [
@@ -715,7 +718,9 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     size=size,
                 )
 
-        response = self.client.post_search(settings.search_index_id, search)
+        response = await run_in_threadpool(
+            self.client.post_search, settings.search_index_id, search
+        )
 
         if response["facet_results"]:
             for facet in response["facet_results"]:
