@@ -26,5 +26,29 @@ stac-fastapi.extensions = "6.0.0"
 stac-fastapi.types = "6.0.0"
 uvicorn = "0.35.0"
 
+[tool.poetry.group.dev.dependencies]
+coverage = { version = ">=7.0.0", extras = ["toml"] }
+pytest = ">=8.0.0"
+
 [tool.poetry.scripts]
 stac-fastapi-globus-search = "stac_fastapi.globus_search.app:run"
+
+[tool.pytest.ini_options]
+addopts = [
+  "--strict-config",
+  "--strict-markers",
+]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["src/stac_fastapi/globus_search"]
+
+[tool.coverage.report]
+exclude_also = [
+  "if __name__ == .__main__.:",
+  "raise NotImplementedError",
+]
+show_missing = true
+skip_covered = false

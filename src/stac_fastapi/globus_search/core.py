@@ -1,13 +1,89 @@
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from fastapi import HTTPException
 from stac_fastapi.core.core import CoreClient
 from stac_fastapi.core.models.links import PagingLinks
 from stac_fastapi.types import stac as stac_types
+from stac_fastapi.types.requests import get_base_url
+from stac_pydantic.links import Relations
+from stac_pydantic.shared import MimeTypes
+from starlette.concurrency import run_in_threadpool
+
+from stac_fastapi.globus_search.utility import list_project_summaries
 
 
 class GlobusSearchClient(CoreClient):
+    async def landing_page(self, **kwargs) -> stac_types.LandingPage:
+        """Landing page."""
+        request = kwargs["request"]
+        base_url = get_base_url(request)
+        landing_page = self._landing_page(
+            base_url=base_url,
+            conformance_classes=self.conformance_classes(),
+            extension_schemas=[],
+        )
+
+        if self.extension_is_enabled("FilterExtension"):
+            landing_page["links"].append(
+                {
+                    "rel": "queryables",
+                    "type": "application/schema+json",
+                    "title": "Queryables",
+                    "href": urljoin(base_url, "queryables"),
+                }
+            )
+
+        if self.extension_is_enabled("AggregationExtension"):
+            landing_page["links"].extend(
+                [
+                    {
+                        "rel": "aggregate",
+                        "type": "application/json",
+                        "title": "Aggregate",
+                        "href": urljoin(base_url, "aggregate"),
+                    },
+                    {
+                        "rel": "aggregations",
+                        "type": "application/json",
+                        "title": "Aggregations",
+                        "href": urljoin(base_url, "aggregations"),
+                    },
+                ]
+            )
+
+        projects = await run_in_threadpool(list_project_summaries)
+        for project in projects:
+            landing_page["links"].append(
+                {
+                    "rel": Relations.child.value,
+                    "type": MimeTypes.json.value,
+                    "title": project.get("title") or project["id"],
+                    "href": urljoin(base_url, f"collections/{project['id']}"),
+                }
+            )
+
+        landing_page["links"].append(
+            {
+                "rel": "service-desc",
+                "type": "application/vnd.oai.openapi+json;version=3.0",
+                "title": "OpenAPI service description",
+                "href": urljoin(
+                    str(request.base_url), request.app.openapi_url.lstrip("/")
+                ),
+            }
+        )
+        landing_page["links"].append(
+            {
+                "rel": "service-doc",
+                "type": "text/html",
+                "title": "OpenAPI service documentation",
+                "href": urljoin(str(request.base_url), request.app.docs_url.lstrip("/")),
+            }
+        )
+
+        return landing_page
+
     async def get_collection(
         self, collection_id: str, **kwargs
     ) -> stac_types.Collection:
@@ -61,14 +137,14 @@ class GlobusSearchClient(CoreClient):
         # Fix item hrefs to match request host
         request_url_href = urlparse(str(request.url))
         for item in items:
-            links = item.get("links", [])
-            for index, link in enumerate(links):
+            item_links = item.get("links", [])
+            for index, link in enumerate(item_links):
                 if type(link) is dict:
                     link_href = urlparse(str(link.get("href", "")))
                     if "localhost" in request_url_href.netloc:
                         link_href = link_href._replace(scheme="http")
                     link_href = link_href._replace(netloc=request_url_href.netloc)
-                    links[index]["href"] = link_href.geturl()
+                    item_links[index]["href"] = link_href.geturl()
 
         return stac_types.ItemCollection(
             type="FeatureCollection",

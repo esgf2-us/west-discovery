@@ -69,6 +69,34 @@ Create the directory before first run if it doesn't exist:
 mkdir -p cache
 ```
 
+## Tests
+
+Install development dependencies, then run pytest:
+
+With Poetry:
+
+```bash
+poetry install --with dev
+poetry run pytest
+```
+
+With pip:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+To generate coverage reports:
+
+```bash
+python -m coverage run -m pytest
+python -m coverage report
+python -m coverage xml -o reports/coverage.xml
+```
+
 ## Configuration
 
 - **Search index**: set in `src/stac_fastapi/globus_search/config.py` as

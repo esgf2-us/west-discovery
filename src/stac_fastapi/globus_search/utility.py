@@ -1,8 +1,13 @@
 import json
+import logging
+from copy import deepcopy
+from functools import lru_cache
 
 import esgvoc.api.projects as ev
 from esgvoc.api.project_specs import DrsType
 from esgvoc.apps.jsg.json_schema_generator import generate_json_schema
+
+logger = logging.getLogger(__name__)
 
 
 def _extract_summaries_from_schema(schema: dict) -> dict:
@@ -46,7 +51,8 @@ def _extract_summaries_from_schema(schema: dict) -> dict:
     return summaries
 
 
-def get_project(project_id: str = "cmip6") -> dict:
+@lru_cache(maxsize=None)
+def _build_project(project_id: str = "cmip6") -> dict:
     """
     Generate a STAC-compliant Collection for an ESGF project.
     Summaries are derived entirely from generate_json_schema() via catalog_specs —
@@ -141,7 +147,61 @@ def get_project(project_id: str = "cmip6") -> dict:
     }
 
 
-def list_projects() -> list[dict]:
+def get_project(project_id: str = "cmip6") -> dict:
+    return deepcopy(_build_project(project_id))
+
+
+@lru_cache(maxsize=1)
+def _build_project_summaries() -> list[dict[str, str]]:
+    """
+    Build lightweight project metadata for landing-page collection links.
+
+    This intentionally avoids generate_json_schema(), which is only needed for
+    full STAC Collection documents.
+    """
+    results = []
+
+    for project_id in ev.get_all_projects():
+        specs = ev.get_project(project_id.lower())
+        if specs is None:
+            logger.warning("Skipping '%s': project not found in esgvoc", project_id)
+            continue
+        if specs.catalog_specs is None:
+            logger.warning(
+                "Skipping '%s': project has no catalog_specs", project_id
+            )
+            continue
+
+        results.append({"id": specs.project_id, "title": specs.drs_name})
+
+    return results
+
+
+def list_project_summaries() -> list[dict[str, str]]:
+    return deepcopy(_build_project_summaries())
+
+
+@lru_cache(maxsize=1)
+def _build_projects() -> list[dict]:
+    """
+    Build the full project list once per process.
+
+    Collection responses are mutated downstream when links are normalized, so public
+    accessors return deep copies instead of the cached objects.
+    """
+    results = []
+
+    for project_id in ev.get_all_projects():
+        try:
+            results.append(_build_project(project_id))
+        except ValueError as e:
+            # Skip projects with missing catalog_specs or not yet fully configured
+            logger.warning("Skipping '%s': %s", project_id, e)
+
+    return results
+
+
+def list_projects() -> tuple[list[dict], None]:
     """
     Return a full STAC Collection document for every project available
     in the local esgvoc installation.
@@ -149,16 +209,7 @@ def list_projects() -> list[dict]:
     Returns the same structure as build_stac_collection() for each project,
     i.e. [{cmip6 collection...}, {obs4mips collection...}, ...]
     """
-    results = []
-
-    for project_id in ev.get_all_projects():
-        try:
-            results.append(get_project(project_id))
-        except ValueError as e:
-            # Skip projects with missing catalog_specs or not yet fully configured
-            print(f"Skipping '{project_id}': {e}")
-
-    return results, None
+    return deepcopy(_build_projects()), None
 
 
 if __name__ == "__main__":
