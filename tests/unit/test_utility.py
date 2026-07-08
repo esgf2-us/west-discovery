@@ -11,6 +11,17 @@ from stac_fastapi.globus_search.utility import (
 )
 
 
+@pytest.fixture(autouse=True)
+def clear_project_caches():
+    utility._build_project.cache_clear()
+    utility._build_project_summaries.cache_clear()
+    utility._build_projects.cache_clear()
+    yield
+    utility._build_project.cache_clear()
+    utility._build_project_summaries.cache_clear()
+    utility._build_projects.cache_clear()
+
+
 def test_extract_summaries_from_schema(item_schema):
     summaries = _extract_summaries_from_schema(item_schema)
 
@@ -180,7 +191,7 @@ def test_get_project_raises_when_catalog_specs_are_missing(monkeypatch):
 
 
 def test_list_projects_returns_collections_and_skips_invalid_projects(
-    monkeypatch, capsys
+    monkeypatch, caplog
 ):
     monkeypatch.setattr(utility.ev, "get_all_projects", lambda: ["cmip6", "bad"])
 
@@ -189,10 +200,10 @@ def test_list_projects_returns_collections_and_skips_invalid_projects(
             raise ValueError("not configured")
         return {"id": project_id}
 
-    monkeypatch.setattr(utility, "get_project", fake_get_project)
+    monkeypatch.setattr(utility, "_build_project", fake_get_project)
 
     results, token = list_projects()
 
     assert results == [{"id": "cmip6"}]
     assert token is None
-    assert "Skipping 'bad': not configured" in capsys.readouterr().out
+    assert "Skipping 'bad': not configured" in caplog.text

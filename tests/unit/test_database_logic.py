@@ -6,6 +6,7 @@ import pytest
 from stac_fastapi.globus_search import database_logic
 from stac_fastapi.globus_search.database_logic import (
     DatabaseLogic,
+    cql_like_to_globus_like,
     cql_to_filter,
     cql_translate_fieldname,
 )
@@ -18,10 +19,30 @@ from stac_fastapi.globus_search.database_logic import (
         ("collection", "collection"),
         ("geometry", "geometry"),
         ("activity_id", "properties.activity_id"),
+        ("cmip6:activity_id", "properties.cmip6:activity_id"),
     ],
 )
 def test_cql_translate_fieldname(fieldname, expected):
     assert cql_translate_fieldname(fieldname) == expected
+
+
+def test_cql_translate_fieldname_uses_single_collection_prefix():
+    assert (
+        cql_translate_fieldname("experiment_id", collection_ids=["CMIP6"])
+        == "properties.cmip6:experiment_id"
+    )
+
+
+@pytest.mark.parametrize(
+    ("pattern", "expected"),
+    [
+        ("hist%", "hist*"),
+        ("ta_", "ta?"),
+        ("CMIP\\_%", "CMIP_*"),
+    ],
+)
+def test_cql_like_to_globus_like(pattern, expected):
+    assert cql_like_to_globus_like(pattern) == expected
 
 
 @pytest.mark.parametrize(
@@ -91,6 +112,7 @@ def test_cql_translate_fieldname(fieldname, expected):
             },
             {
                 "type": "geo_shape",
+                "field_name": "geometry",
                 "relation": "intersects",
                 "shape": {"type": "Point", "coordinates": [0, 1]},
             },
@@ -105,6 +127,7 @@ def test_cql_translate_fieldname(fieldname, expected):
             },
             {
                 "type": "geo_shape",
+                "field_name": "geometry",
                 "relation": "within",
                 "shape": {"type": "Polygon", "coordinates": []},
             },
@@ -134,7 +157,7 @@ def test_cql_to_filter_translates_boolean_groups():
             },
             {
                 "type": "match_any",
-                "field_name": "variable_id",
+                "field_name": "properties.variable_id",
                 "values": ["tas", "pr"],
             },
         ],
@@ -165,7 +188,6 @@ def test_cql_to_filter_translates_not_and_collapses_double_negative():
     [
         "<",
         ">",
-        "like",
         "between",
         "s_contains",
         "s_disjoint",
@@ -300,6 +322,24 @@ def test_apply_cql2_filter_appends_translated_filter():
             "values": ["CMIP6"],
         }
     ]
+
+
+def test_apply_cql2_filter_uses_collection_prefix_for_property_filters():
+    search = globus_sdk.SearchQuery()
+    search["filters"] = [
+        {"type": "match_any", "field_name": "collection", "values": ["CMIP6"]}
+    ]
+
+    returned = DatabaseLogic.apply_cql2_filter(
+        search, {"op": "like", "args": [{"property": "experiment_id"}, "hist%"]}
+    )
+
+    assert returned is search
+    assert search["filters"][-1] == {
+        "type": "like",
+        "field_name": "properties.cmip6:experiment_id",
+        "value": "hist*",
+    }
 
 
 def test_apply_cql2_filter_leaves_search_unchanged_without_filter():
