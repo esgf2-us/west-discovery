@@ -7,7 +7,6 @@ import typing as t
 
 import attrs
 import globus_sdk
-from fastapi import HTTPException
 from stac_fastapi.core import serializers
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
@@ -17,25 +16,6 @@ from .convert import search_doc_to_stac_item
 from .utility import get_project, list_projects
 
 _client = settings.search_client
-
-
-def _collection_property_prefix(collection_ids: list[str] | None) -> str | None:
-    if not collection_ids or len(collection_ids) != 1:
-        return None
-    return collection_ids[0].lower()
-
-
-def cql_translate_fieldname(
-    fieldname: str, collection_ids: list[str] | None = None
-) -> str:
-    if fieldname in ("id", "collection", "geometry"):
-        return fieldname
-    if ":" in fieldname:
-        return f"properties.{fieldname}"
-    if collection_prefix := _collection_property_prefix(collection_ids):
-        return f"properties.{collection_prefix}:{fieldname}"
-    return f"properties.{fieldname}"
-
 
 def cql_like_to_globus_like(pattern: str) -> str:
     out = []
@@ -133,25 +113,21 @@ def cql_to_filter(
             # We have made the single arg assumption for several of these
             # without checks that it is true.
             assert len(cql_query["args"]) == 2
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
+            
             return {
                 "type": "match_any",
-                "field_name": fieldname,
+                "field_name": cql_query["args"][0]["property"],
                 "values": [cql_query["args"][1]],
             }
         case "<>":
             # 'not match_all', see comments in '=' above
             assert len(cql_query["args"]) == 2
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
+            
             return {
                 "type": "not",
                 "filter": {
                     "type": "match_any",
-                    "field_name": fieldname,
+                    "field_name":  cql_query["args"][0]["property"],
                     "values": [cql_query["args"][1]],
                 },
             }
@@ -159,40 +135,35 @@ def cql_to_filter(
             # we only have '<=' and '>=' in Search today
             raise NotImplementedError("'>' and '<' filters are not supported yet")
         case "isNull":
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
+            
             # isNull => not(exists)
             return {
                 "type": "not",
-                "filter": {"type": "exists", "field_name": fieldname},
+                "filter": {
+                    "type": "exists", 
+                    "field_name": cql_query["args"][0]["property"]
+                },
             }
         case "<=":
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
+            
             value = cql_query["args"][1]
             return {
                 "type": "range",
-                "field_name": fieldname,
+                "field_name": cql_query["args"][0]["property"],
                 "values": [{"from": "*", "to": value}],
             }
         case ">=":
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
+            
             value = cql_query["args"][1]
             return {
                 "type": "range",
-                "field_name": fieldname,
+                "field_name": cql_query["args"][0]["property"],
                 "values": [{"from": value, "to": "*"}],
             }
         # ADVANCED COMPARISON OPERATORS (???)
         case "like":
             assert len(cql_query["args"]) == 2
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
+            
             value = cql_query["args"][1]
 
             if not isinstance(value, str):
@@ -200,31 +171,27 @@ def cql_to_filter(
 
             return {
                 "type": "like",
-                "field_name": fieldname,
+                "field_name": cql_query["args"][0]["property"],
                 "value": cql_like_to_globus_like(value),
             }
         case "between":
             # range filter should work
             raise NotImplementedError("'between' filter is not supported yet")
         case "in":
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
+            
             return {
                 "type": "match_any",
-                "field_name": fieldname,
+                "field_name": cql_query["args"][0]["property"],
                 "values": cql_query["args"][1],
             }
         # SPATIAL OPERATORS (partial)
         # note that this divides in the filter spec between "Basic Spatial Operators"
         # and "Spatial Operators"
         case "s_intersects" | "s_within":
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
+            
             return {
                 "type": "geo_shape",
-                "field_name": fieldname,
+                "field_name": cql_query["args"][0]["property"],
                 "relation": cql_op[2:],
                 "shape": cql_query["args"][1],
             }
