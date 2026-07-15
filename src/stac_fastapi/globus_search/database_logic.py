@@ -9,6 +9,7 @@ import attrs
 import globus_sdk
 from stac_fastapi.core import serializers
 from starlette.concurrency import run_in_threadpool
+from starlette.exceptions import HTTPException
 from starlette.requests import Request
 
 from .config import settings
@@ -390,8 +391,8 @@ class DatabaseLogic:
                 _client.scroll, settings.search_index_id, search
             )
         except globus_sdk.SearchAPIError as e:
-            print("SearchAPIError:")
-            print(e.text)
+            if e.http_status == 400:
+                raise HTTPException(status_code=400, detail=e.message)
             raise
         return (
             [search_doc_to_stac_item(doc) for doc in response["gmeta"]],
