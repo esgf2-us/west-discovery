@@ -8,29 +8,8 @@ from stac_fastapi.globus_search.database_logic import (
     DatabaseLogic,
     cql_like_to_globus_like,
     cql_to_filter,
-    cql_translate_fieldname,
 )
 
-
-@pytest.mark.parametrize(
-    ("fieldname", "expected"),
-    [
-        ("id", "id"),
-        ("collection", "collection"),
-        ("geometry", "geometry"),
-        ("activity_id", "properties.activity_id"),
-        ("cmip6:activity_id", "properties.cmip6:activity_id"),
-    ],
-)
-def test_cql_translate_fieldname(fieldname, expected):
-    assert cql_translate_fieldname(fieldname) == expected
-
-
-def test_cql_translate_fieldname_uses_single_collection_prefix():
-    assert (
-        cql_translate_fieldname("experiment_id", collection_ids=["CMIP6"])
-        == "properties.cmip6:experiment_id"
-    )
 
 
 @pytest.mark.parametrize(
@@ -69,7 +48,7 @@ def test_cql_like_to_globus_like(pattern, expected):
             },
         ),
         (
-            {"op": "isNull", "args": [{"property": "variable_id"}]},
+            {"op": "isNull", "args": [{"property": "properties.variable_id"}]},
             {
                 "type": "not",
                 "filter": {
@@ -79,7 +58,7 @@ def test_cql_like_to_globus_like(pattern, expected):
             },
         ),
         (
-            {"op": "<=", "args": [{"property": "datetime"}, "2026-01-01"]},
+            {"op": "<=", "args": [{"property": "properties.datetime"}, "2026-01-01"]},
             {
                 "type": "range",
                 "field_name": "properties.datetime",
@@ -87,7 +66,7 @@ def test_cql_like_to_globus_like(pattern, expected):
             },
         ),
         (
-            {"op": ">=", "args": [{"property": "datetime"}, "2025-01-01"]},
+            {"op": ">=", "args": [{"property": "properties.datetime"}, "2025-01-01"]},
             {
                 "type": "range",
                 "field_name": "properties.datetime",
@@ -143,7 +122,7 @@ def test_cql_to_filter_translates_boolean_groups():
         "op": "and",
         "args": [
             {"op": "=", "args": [{"property": "collection"}, "CMIP6"]},
-            {"op": "in", "args": [{"property": "variable_id"}, ["tas", "pr"]]},
+            {"op": "in", "args": [{"property": "properties.variable_id"}, ["tas", "pr"]]},
         ],
     }
 
@@ -323,23 +302,6 @@ def test_apply_cql2_filter_appends_translated_filter():
         }
     ]
 
-
-def test_apply_cql2_filter_uses_collection_prefix_for_property_filters():
-    search = globus_sdk.SearchQuery()
-    search["filters"] = [
-        {"type": "match_any", "field_name": "collection", "values": ["CMIP6"]}
-    ]
-
-    returned = DatabaseLogic.apply_cql2_filter(
-        search, {"op": "like", "args": [{"property": "experiment_id"}, "hist%"]}
-    )
-
-    assert returned is search
-    assert search["filters"][-1] == {
-        "type": "like",
-        "field_name": "properties.cmip6:experiment_id",
-        "value": "hist*",
-    }
 
 
 def test_apply_cql2_filter_leaves_search_unchanged_without_filter():
