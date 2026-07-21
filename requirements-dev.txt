@@ -1,4 +1,5 @@
 -r requirements.txt
 
-coverage[toml]>=7.0.0
-pytest>=8.0.0
+coverage[toml]>=7.15.1
+isort>=8.0.1
+pytest>=9.1.1
