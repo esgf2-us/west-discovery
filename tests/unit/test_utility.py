@@ -3,12 +3,9 @@ from types import SimpleNamespace
 import pytest
 
 from stac_fastapi.globus_search import utility
-from stac_fastapi.globus_search.utility import (
-    DrsType,
-    _extract_summaries_from_schema,
-    get_project,
-    list_projects,
-)
+from stac_fastapi.globus_search.utility import (DrsType,
+                                                _extract_summaries_from_schema,
+                                                get_project, list_projects)
 
 
 @pytest.fixture(autouse=True)
@@ -62,7 +59,9 @@ def _project_specs(*, catalog_specs=True, drs_specs=True):
                 parts=[
                     SimpleNamespace(source_collection="activity_id", is_required=True),
                     SimpleNamespace(source_collection="source_id", is_required=False),
-                    SimpleNamespace(source_collection="experiment_id", is_required=True),
+                    SimpleNamespace(
+                        source_collection="experiment_id", is_required=True
+                    ),
                 ],
             )
         }

@@ -78,7 +78,9 @@ class GlobusSearchClient(CoreClient):
                 "rel": "service-doc",
                 "type": "text/html",
                 "title": "OpenAPI service documentation",
-                "href": urljoin(str(request.base_url), request.app.docs_url.lstrip("/")),
+                "href": urljoin(
+                    str(request.base_url), request.app.docs_url.lstrip("/")
+                ),
             }
         )
 

@@ -91,7 +91,7 @@ def _build_project(project_id: str = "cmip6") -> dict:
         links.append(
             {
                 "rel": "describedby",
-                "href": f"https://github.com/WCRP-CMIP/CMIP6_CVs",
+                "href": "https://github.com/WCRP-CMIP/CMIP6_CVs",
                 "type": "text/html",
                 "title": f"{drs_name} CV — dataset_id template: {template}",
             }
@@ -167,9 +167,7 @@ def _build_project_summaries() -> list[dict[str, str]]:
             logger.warning("Skipping '%s': project not found in esgvoc", project_id)
             continue
         if specs.catalog_specs is None:
-            logger.warning(
-                "Skipping '%s': project has no catalog_specs", project_id
-            )
+            logger.warning("Skipping '%s': project has no catalog_specs", project_id)
             continue
 
         results.append({"id": specs.project_id, "title": specs.drs_name})

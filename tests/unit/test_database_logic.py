@@ -4,12 +4,9 @@ import globus_sdk
 import pytest
 
 from stac_fastapi.globus_search import database_logic
-from stac_fastapi.globus_search.database_logic import (
-    DatabaseLogic,
-    cql_like_to_globus_like,
-    cql_to_filter,
-)
-
+from stac_fastapi.globus_search.database_logic import (DatabaseLogic,
+                                                       cql_like_to_globus_like,
+                                                       cql_to_filter)
 
 
 @pytest.mark.parametrize(
@@ -122,7 +119,10 @@ def test_cql_to_filter_translates_boolean_groups():
         "op": "and",
         "args": [
             {"op": "=", "args": [{"property": "collection"}, "CMIP6"]},
-            {"op": "in", "args": [{"property": "properties.variable_id"}, ["tas", "pr"]]},
+            {
+                "op": "in",
+                "args": [{"property": "properties.variable_id"}, ["tas", "pr"]],
+            },
         ],
     }
 
@@ -301,7 +301,6 @@ def test_apply_cql2_filter_appends_translated_filter():
             "values": ["CMIP6"],
         }
     ]
-
 
 
 def test_apply_cql2_filter_leaves_search_unchanged_without_filter():

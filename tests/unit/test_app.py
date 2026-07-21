@@ -5,12 +5,9 @@ from types import SimpleNamespace
 import pytest
 from hishel.asgi import ASGICacheMiddleware
 from stac_fastapi.api.app import StacApi
-from stac_fastapi.extensions.core import (
-    AggregationExtension,
-    FilterExtension,
-    FreeTextExtension,
-    TokenPaginationExtension,
-)
+from stac_fastapi.extensions.core import (AggregationExtension,
+                                          FilterExtension, FreeTextExtension,
+                                          TokenPaginationExtension)
 from stac_fastapi.extensions.core.free_text import FreeTextConformanceClasses
 
 from stac_fastapi.globus_search import app
@@ -18,11 +15,9 @@ from stac_fastapi.globus_search.core import GlobusSearchClient
 from stac_fastapi.globus_search.database_logic import DatabaseLogic
 from stac_fastapi.globus_search.extensions.aggregration import (
     GlobusAggregationExtensionGetRequest,
-    GlobusAggregationExtensionPostRequest,
-)
-from stac_fastapi.globus_search.extensions.aggregration.client import (
-    GlobusSearchAggregationClient,
-)
+    GlobusAggregationExtensionPostRequest)
+from stac_fastapi.globus_search.extensions.aggregration.client import \
+    GlobusSearchAggregationClient
 
 
 def test_app_wires_database_session_client_and_handler():
@@ -77,7 +72,9 @@ def test_app_configures_cached_collection_items_route():
 
 def test_run_calls_uvicorn_with_settings(monkeypatch):
     calls = []
-    fake_uvicorn = SimpleNamespace(run=lambda *args, **kwargs: calls.append((args, kwargs)))
+    fake_uvicorn = SimpleNamespace(
+        run=lambda *args, **kwargs: calls.append((args, kwargs))
+    )
     monkeypatch.setitem(sys.modules, "uvicorn", fake_uvicorn)
     monkeypatch.setattr(
         app,

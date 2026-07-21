@@ -6,9 +6,7 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from stac_fastapi.globus_search.extensions.aggregration.client import (
-    GlobusSearchAggregationClient,
-    find_first_non_alphanumeric,
-)
+    GlobusSearchAggregationClient, find_first_non_alphanumeric)
 
 
 def _request(path="/aggregations", host="api.example.org"):
@@ -52,7 +50,9 @@ class FakeSearchClient:
 
 
 def _client(database=None, search_response=None):
-    client = GlobusSearchAggregationClient(database=database or FakeDatabase(), session=None)
+    client = GlobusSearchAggregationClient(
+        database=database or FakeDatabase(), session=None
+    )
     client.client = FakeSearchClient(
         search_response
         if search_response is not None
@@ -103,7 +103,8 @@ def test_get_aggregations_returns_collection_defaults_and_links():
 
     assert result["type"] == "AggregationCollection"
     assert result["aggregations"] == (
-        client.CMIP6_DEFAULT_AGGREGATIONS + [{"name": "total_count", "data_type": "integer"}]
+        client.CMIP6_DEFAULT_AGGREGATIONS
+        + [{"name": "total_count", "data_type": "integer"}]
     )
     assert result["links"] == [
         {
@@ -187,9 +188,7 @@ def test_aggregate_total_count_returns_search_total():
     assert search["limit"] == 0
     assert result == {
         "type": "AggregationCollection",
-        "aggregations": [
-            {"name": "total_count", "data_type": "integer", "value": 42}
-        ],
+        "aggregations": [{"name": "total_count", "data_type": "integer", "value": 42}],
         "links": [
             {
                 "rel": "root",
@@ -218,7 +217,10 @@ def test_aggregate_request_can_drive_filter_collection_and_size():
     )
 
     assert database.calls == [
-        ("apply_cql2_filter", {"op": "=", "args": [{"property": "collection"}, "CMIP6"]}),
+        (
+            "apply_cql2_filter",
+            {"op": "=", "args": [{"property": "collection"}, "CMIP6"]},
+        ),
         ("apply_collections_filter", ["CMIP6"]),
     ]
     index_id, search = client.client.calls[0]

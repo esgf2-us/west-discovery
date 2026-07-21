@@ -3,20 +3,17 @@ This app definition is a fork of the one from the Mongo backend for
 stac-fastapi.
 """
 
-import os
 
 from hishel import AsyncSqliteStorage
 from hishel.asgi import ASGICacheMiddleware
 from hishel.fastapi import cache
 from stac_fastapi.api.app import StacApi
-from stac_fastapi.api.models import create_get_request_model, create_post_request_model
+from stac_fastapi.api.models import (create_get_request_model,
+                                     create_post_request_model)
 from stac_fastapi.core.session import Session
-from stac_fastapi.extensions.core import (
-    AggregationExtension,
-    FilterExtension,
-    FreeTextExtension,
-    TokenPaginationExtension,
-)
+from stac_fastapi.extensions.core import (AggregationExtension,
+                                          FilterExtension, FreeTextExtension,
+                                          TokenPaginationExtension)
 from stac_fastapi.extensions.core.free_text import FreeTextConformanceClasses
 from stac_fastapi.sfeos_helpers.filter import EsAsyncBaseFiltersClient
 from stac_fastapi.types.config import ApiSettings
@@ -26,11 +23,9 @@ from stac_fastapi.globus_search.core import GlobusSearchClient
 from stac_fastapi.globus_search.database_logic import DatabaseLogic
 from stac_fastapi.globus_search.extensions.aggregration import (
     GlobusAggregationExtensionGetRequest,
-    GlobusAggregationExtensionPostRequest,
-)
-from stac_fastapi.globus_search.extensions.aggregration.client import (
-    GlobusSearchAggregationClient,
-)
+    GlobusAggregationExtensionPostRequest)
+from stac_fastapi.globus_search.extensions.aggregration.client import \
+    GlobusSearchAggregationClient
 
 database_logic = DatabaseLogic()
 session = Session.create_from_settings(ApiSettings())
@@ -81,7 +76,7 @@ api = StacApi(
 )
 handler = ASGICacheMiddleware(
     api.app,
-    storage=AsyncSqliteStorage(database_path=f"/tmp/hishel_cache.db"),
+    storage=AsyncSqliteStorage(database_path="/tmp/hishel_cache.db"),
 )
 
 
