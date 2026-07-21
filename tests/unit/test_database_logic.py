@@ -4,9 +4,11 @@ import globus_sdk
 import pytest
 
 from stac_fastapi.globus_search import database_logic
-from stac_fastapi.globus_search.database_logic import (DatabaseLogic,
-                                                       cql_like_to_globus_like,
-                                                       cql_to_filter)
+from stac_fastapi.globus_search.database_logic import (
+    DatabaseLogic,
+    cql_like_to_globus_like,
+    cql_to_filter,
+)
 
 
 @pytest.mark.parametrize(

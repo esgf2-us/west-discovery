@@ -18,6 +18,7 @@ from .utility import get_project, list_projects
 
 _client = settings.search_client
 
+
 def cql_like_to_globus_like(pattern: str) -> str:
     out = []
     escaped = False
@@ -114,7 +115,7 @@ def cql_to_filter(
             # We have made the single arg assumption for several of these
             # without checks that it is true.
             assert len(cql_query["args"]) == 2
-            
+
             return {
                 "type": "match_any",
                 "field_name": cql_query["args"][0]["property"],
@@ -123,12 +124,12 @@ def cql_to_filter(
         case "<>":
             # 'not match_all', see comments in '=' above
             assert len(cql_query["args"]) == 2
-            
+
             return {
                 "type": "not",
                 "filter": {
                     "type": "match_any",
-                    "field_name":  cql_query["args"][0]["property"],
+                    "field_name": cql_query["args"][0]["property"],
                     "values": [cql_query["args"][1]],
                 },
             }
@@ -136,17 +137,17 @@ def cql_to_filter(
             # we only have '<=' and '>=' in Search today
             raise NotImplementedError("'>' and '<' filters are not supported yet")
         case "isNull":
-            
+
             # isNull => not(exists)
             return {
                 "type": "not",
                 "filter": {
-                    "type": "exists", 
-                    "field_name": cql_query["args"][0]["property"]
+                    "type": "exists",
+                    "field_name": cql_query["args"][0]["property"],
                 },
             }
         case "<=":
-            
+
             value = cql_query["args"][1]
             return {
                 "type": "range",
@@ -154,7 +155,7 @@ def cql_to_filter(
                 "values": [{"from": "*", "to": value}],
             }
         case ">=":
-            
+
             value = cql_query["args"][1]
             return {
                 "type": "range",
@@ -164,7 +165,7 @@ def cql_to_filter(
         # ADVANCED COMPARISON OPERATORS (???)
         case "like":
             assert len(cql_query["args"]) == 2
-            
+
             value = cql_query["args"][1]
 
             if not isinstance(value, str):
@@ -179,7 +180,7 @@ def cql_to_filter(
             # range filter should work
             raise NotImplementedError("'between' filter is not supported yet")
         case "in":
-            
+
             return {
                 "type": "match_any",
                 "field_name": cql_query["args"][0]["property"],
@@ -189,7 +190,7 @@ def cql_to_filter(
         # note that this divides in the filter spec between "Basic Spatial Operators"
         # and "Spatial Operators"
         case "s_intersects" | "s_within":
-            
+
             return {
                 "type": "geo_shape",
                 "field_name": cql_query["args"][0]["property"],
