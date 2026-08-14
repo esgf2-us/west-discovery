@@ -70,7 +70,7 @@ def cql_to_filter(
       https://docs.ogc.org/DRAFTS/21-065.html#temporal-functions
     """
     if "op" not in cql_query:
-        return {}
+        raise ValueError("CQL2 filter must include an 'op' field")
     cql_op = cql_query["op"]
 
     # each group of matches is marked with one of the following qualifiers:
@@ -114,7 +114,10 @@ def cql_to_filter(
             #
             # We have made the single arg assumption for several of these
             # without checks that it is true.
-            assert len(cql_query["args"]) == 2
+            if len(cql_query["args"]) != 2:
+                raise ValueError(
+                    f"'=' filter requires exactly 2 arguments, got {len(cql_query['args'])}"
+                )
 
             return {
                 "type": "match_any",
@@ -123,7 +126,10 @@ def cql_to_filter(
             }
         case "<>":
             # 'not match_all', see comments in '=' above
-            assert len(cql_query["args"]) == 2
+            if len(cql_query["args"]) != 2:
+                raise ValueError(
+                    f"'<>' filter requires exactly 2 arguments, got {len(cql_query['args'])}"
+                )
 
             return {
                 "type": "not",
@@ -164,7 +170,10 @@ def cql_to_filter(
             }
         # ADVANCED COMPARISON OPERATORS (???)
         case "like":
-            assert len(cql_query["args"]) == 2
+            if len(cql_query["args"]) != 2:
+                raise ValueError(
+                    f"'like' filter requires exactly 2 arguments, got {len(cql_query['args'])}"
+                )
 
             value = cql_query["args"][1]
 
@@ -284,7 +293,10 @@ class DatabaseLogic:
     )
 
     async def find_collection(self, collection_id: str) -> dict:
-        return await run_in_threadpool(get_project, collection_id)
+        try:
+            return await run_in_threadpool(get_project, collection_id)
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
 
     async def get_all_collections(
         self, token: str | None, limit: int, request: Request
@@ -292,9 +304,16 @@ class DatabaseLogic:
         return await run_in_threadpool(list_projects)
 
     async def get_one_item(self, collection_id: str, item_id: str) -> dict:
-        res = await run_in_threadpool(
-            _client.get_subject, settings.search_index_id, item_id
-        )
+        try:
+            res = await run_in_threadpool(
+                _client.get_subject, settings.search_index_id, item_id
+            )
+        except globus_sdk.SearchAPIError as e:
+            if e.http_status == 404:
+                raise HTTPException(
+                    status_code=404, detail=f"Item '{item_id}' not found"
+                )
+            raise
         return search_doc_to_stac_item(res.data)
 
     @staticmethod
@@ -340,9 +359,16 @@ class DatabaseLogic:
     ):
         if filter_:
             search["filters"] = search.get("filters", [])
-            search["filters"].append(
-                cql_to_filter(filter_, collection_ids=_extract_collection_ids(search))
-            )
+            try:
+                search["filters"].append(
+                    cql_to_filter(
+                        filter_, collection_ids=_extract_collection_ids(search)
+                    )
+                )
+            except (ValueError, KeyError, IndexError) as e:
+                raise HTTPException(status_code=400, detail=f"Malformed CQL2 filter: {e}")
+            except NotImplementedError as e:
+                raise HTTPException(status_code=501, detail=str(e))
         return search
 
     @staticmethod
@@ -394,7 +420,15 @@ class DatabaseLogic:
         except globus_sdk.SearchAPIError as e:
             if e.http_status == 400:
                 raise HTTPException(status_code=400, detail=e.message)
-            raise
+            if e.http_status == 404:
+                raise HTTPException(status_code=404, detail="Search index not found")
+            if e.http_status in (401, 403):
+                raise HTTPException(
+                    status_code=e.http_status, detail="Access denied to search index"
+                )
+            raise HTTPException(
+                status_code=502, detail=f"Upstream search error: {e.message}"
+            )
         return (
             [search_doc_to_stac_item(doc) for doc in response["gmeta"]],
             response["total"],
