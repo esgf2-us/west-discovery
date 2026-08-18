@@ -209,3 +209,68 @@ def test_list_projects_returns_collections_and_skips_invalid_projects(
     assert results == [{"id": "cmip6"}]
     assert token is None
     assert "Skipping 'bad': not configured" in caplog.text
+
+
+def _project_summary_specs(project_id, drs_name, *, has_catalog_specs=True):
+    return SimpleNamespace(
+        project_id=project_id,
+        drs_name=drs_name,
+        catalog_specs=object() if has_catalog_specs else None,
+    )
+
+
+def test_list_project_summaries_returns_id_and_title_for_each_project(monkeypatch):
+    monkeypatch.setattr(utility.ev, "get_all_projects", lambda: ["cmip6", "obs4mips"])
+
+    def fake_get_project(project_id):
+        return {
+            "cmip6": _project_summary_specs("cmip6", "CMIP6"),
+            "obs4mips": _project_summary_specs("obs4mips", "obs4MIPs"),
+        }[project_id]
+
+    monkeypatch.setattr(utility.ev, "get_project", fake_get_project)
+
+    result = utility.list_project_summaries()
+
+    assert result == [
+        {"id": "cmip6", "title": "CMIP6"},
+        {"id": "obs4mips", "title": "obs4MIPs"},
+    ]
+
+
+def test_list_project_summaries_skips_projects_not_found_in_esgvoc(
+    monkeypatch, caplog
+):
+    monkeypatch.setattr(utility.ev, "get_all_projects", lambda: ["cmip6", "unknown"])
+
+    def fake_get_project(project_id):
+        if project_id == "unknown":
+            return None
+        return _project_summary_specs("cmip6", "CMIP6")
+
+    monkeypatch.setattr(utility.ev, "get_project", fake_get_project)
+
+    result = utility.list_project_summaries()
+
+    assert result == [{"id": "cmip6", "title": "CMIP6"}]
+    assert "Skipping 'unknown': project not found in esgvoc" in caplog.text
+
+
+def test_list_project_summaries_skips_projects_without_catalog_specs(
+    monkeypatch, caplog
+):
+    monkeypatch.setattr(
+        utility.ev, "get_all_projects", lambda: ["cmip6", "incomplete"]
+    )
+
+    def fake_get_project(project_id):
+        if project_id == "incomplete":
+            return _project_summary_specs("incomplete", "Incomplete", has_catalog_specs=False)
+        return _project_summary_specs("cmip6", "CMIP6")
+
+    monkeypatch.setattr(utility.ev, "get_project", fake_get_project)
+
+    result = utility.list_project_summaries()
+
+    assert result == [{"id": "cmip6", "title": "CMIP6"}]
+    assert "Skipping 'incomplete': project has no catalog_specs" in caplog.text

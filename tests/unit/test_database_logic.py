@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import MagicMock
 
 import globus_sdk
 import pytest
@@ -483,3 +484,57 @@ def test_execute_search_sets_pagination_token(monkeypatch):
     )
 
     assert result == ([], 0, None)
+
+
+def test_cql_like_to_globus_like_raises_on_trailing_escape():
+    with pytest.raises(ValueError, match="cannot end with an escape character"):
+        cql_like_to_globus_like("hist\\")
+
+
+def test_cql_to_filter_raises_value_error_for_like_with_non_string_pattern():
+    with pytest.raises(ValueError, match="requires a string pattern"):
+        cql_to_filter({"op": "like", "args": [{"property": "activity_id"}, 42]})
+
+
+def test_apply_cql2_filter_detects_collection_prefix_past_non_matching_filters():
+    search = globus_sdk.SearchQuery()
+    search["filters"] = [
+        {"type": "exists", "field_name": "id"},
+        {"type": "match_any", "field_name": "collection", "values": ["CMIP6"]},
+    ]
+
+    DatabaseLogic.apply_cql2_filter(
+        search, {"op": "like", "args": [{"property": "experiment_id"}, "hist%"]}
+    )
+
+    assert search["filters"][-1] == {
+        "type": "like",
+        "field_name": "properties.cmip6:experiment_id",
+        "value": "hist*",
+    }
+
+
+def test_execute_search_propagates_search_api_error(monkeypatch):
+    r = MagicMock()
+    r.status_code = 503
+    r.headers = {"Content-Type": "text/plain"}
+    r.text = "service unavailable"
+    r.json.side_effect = ValueError("not json")
+    api_error = globus_sdk.SearchAPIError(r)
+
+    class FakeClient:
+        def scroll(self, index_id, search):
+            raise api_error
+
+    monkeypatch.setattr(database_logic, "_client", FakeClient())
+
+    with pytest.raises(globus_sdk.SearchAPIError):
+        asyncio.run(
+            DatabaseLogic().execute_search(
+                search=globus_sdk.SearchScrollQuery(),
+                limit=10,
+                token=None,
+                sort=None,
+                collection_ids=None,
+            )
+        )

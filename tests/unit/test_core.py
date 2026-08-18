@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
+from stac_fastapi.extensions.core import AggregationExtension, FilterExtension
 from starlette.requests import Request
 
 from stac_fastapi.globus_search import core as core_module
@@ -25,6 +26,33 @@ def _request(
             "scheme": scheme,
             "server": (host, 443),
             "client": ("testclient", 50000),
+        }
+    )
+
+
+def _request_with_app(
+    path="/",
+    host="api.example.org",
+    scheme="https",
+    openapi_url="/openapi.json",
+    docs_url="/docs",
+):
+    fake_app = SimpleNamespace(
+        state=SimpleNamespace(router_prefix=""),
+        openapi_url=openapi_url,
+        docs_url=docs_url,
+    )
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": path,
+            "headers": [(b"host", host.encode())],
+            "query_string": b"",
+            "scheme": scheme,
+            "server": (host, 443),
+            "client": ("testclient", 50000),
+            "app": fake_app,
         }
     )
 
@@ -80,8 +108,11 @@ class FakeDatabase:
         return self.items, self.total, self.next_marker
 
 
-def _client(database=None):
-    return GlobusSearchClient(database=database or FakeDatabase())
+def _client(database=None, extensions=None):
+    return GlobusSearchClient(
+        database=database or FakeDatabase(),
+        extensions=extensions or [],
+    )
 
 
 @pytest.mark.parametrize(
@@ -376,3 +407,90 @@ def test_post_search_wraps_free_text_errors_in_http_400():
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Error with free-text query: bad q"
+
+
+def test_landing_page_includes_service_links(monkeypatch):
+    monkeypatch.setattr(core_module, "list_project_summaries", lambda: [])
+
+    page = asyncio.run(_client().landing_page(request=_request_with_app()))
+
+    service_desc = next(l for l in page["links"] if l["rel"] == "service-desc")
+    assert service_desc["href"] == "https://api.example.org/openapi.json"
+    service_doc = next(l for l in page["links"] if l["rel"] == "service-doc")
+    assert service_doc["href"] == "https://api.example.org/docs"
+
+
+def test_landing_page_adds_child_link_for_each_project(monkeypatch):
+    monkeypatch.setattr(
+        core_module,
+        "list_project_summaries",
+        lambda: [{"id": "cmip6", "title": "CMIP6"}, {"id": "obs4mips", "title": "obs4MIPs"}],
+    )
+
+    page = asyncio.run(_client().landing_page(request=_request_with_app()))
+
+    child_links = [l for l in page["links"] if l["rel"] == "child"]
+    assert len(child_links) == 2
+    assert child_links[0]["href"] == "https://api.example.org/collections/cmip6"
+    assert child_links[0]["title"] == "CMIP6"
+    assert child_links[1]["href"] == "https://api.example.org/collections/obs4mips"
+    assert child_links[1]["title"] == "obs4MIPs"
+
+
+def test_landing_page_uses_project_id_as_title_when_title_is_absent(monkeypatch):
+    monkeypatch.setattr(
+        core_module, "list_project_summaries", lambda: [{"id": "cmip6"}]
+    )
+
+    page = asyncio.run(_client().landing_page(request=_request_with_app()))
+
+    child_link = next(l for l in page["links"] if l["rel"] == "child")
+    assert child_link["title"] == "cmip6"
+
+
+def test_landing_page_adds_queryables_link_when_filter_extension_is_enabled(monkeypatch):
+    monkeypatch.setattr(core_module, "list_project_summaries", lambda: [])
+
+    page = asyncio.run(
+        _client(extensions=[FilterExtension()]).landing_page(
+            request=_request_with_app()
+        )
+    )
+
+    queryables_links = [l for l in page["links"] if l["rel"] == "queryables"]
+    assert len(queryables_links) == 1
+    assert queryables_links[0]["href"] == "https://api.example.org/queryables"
+
+
+def test_landing_page_omits_queryables_link_without_filter_extension(monkeypatch):
+    monkeypatch.setattr(core_module, "list_project_summaries", lambda: [])
+
+    page = asyncio.run(_client().landing_page(request=_request_with_app()))
+
+    assert not any(l["rel"] == "queryables" for l in page["links"])
+
+
+def test_landing_page_adds_aggregate_links_when_aggregation_extension_is_enabled(
+    monkeypatch,
+):
+    monkeypatch.setattr(core_module, "list_project_summaries", lambda: [])
+
+    page = asyncio.run(
+        _client(extensions=[AggregationExtension()]).landing_page(
+            request=_request_with_app()
+        )
+    )
+
+    aggregate = next(l for l in page["links"] if l["rel"] == "aggregate")
+    assert aggregate["href"] == "https://api.example.org/aggregate"
+    aggregations = next(l for l in page["links"] if l["rel"] == "aggregations")
+    assert aggregations["href"] == "https://api.example.org/aggregations"
+
+
+def test_landing_page_omits_aggregate_links_without_aggregation_extension(monkeypatch):
+    monkeypatch.setattr(core_module, "list_project_summaries", lambda: [])
+
+    page = asyncio.run(_client().landing_page(request=_request_with_app()))
+
+    assert not any(l["rel"] == "aggregate" for l in page["links"])
+    assert not any(l["rel"] == "aggregations" for l in page["links"])
