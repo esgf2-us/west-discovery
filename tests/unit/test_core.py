@@ -353,7 +353,32 @@ def test_post_search_wraps_cql2_filter_errors_in_http_400():
         )
 
     assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "Error with cql2_json filter: bad cql"
+    assert exc_info.value.detail == "Malformed CQL2 filter: bad cql"
+
+
+def test_post_search_wraps_cql2_not_implemented_in_http_501():
+    class BadFilterDatabase(FakeDatabase):
+        def apply_cql2_filter(self, search, filter_):
+            raise NotImplementedError("not supported")
+
+    search_request = SimpleNamespace(
+        ids=None,
+        collections=None,
+        datetime=None,
+        bbox=None,
+        intersects=None,
+        filter_expr={"op": "t_after"},
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            _client(BadFilterDatabase()).post_search(
+                search_request, _request(path="/search")
+            )
+        )
+
+    assert exc_info.value.status_code == 501
+    assert exc_info.value.detail == "not supported"
 
 
 def test_post_search_wraps_free_text_errors_in_http_400():
@@ -379,6 +404,44 @@ def test_post_search_wraps_free_text_errors_in_http_400():
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Error with free-text query: bad q"
+
+
+def test_get_collection_raises_404_when_project_not_found(monkeypatch):
+    async def fake_get_collection(self, collection_id, **kwargs):
+        raise ValueError("unknown project")
+
+    monkeypatch.setattr(core_module.CoreClient, "get_collection", fake_get_collection)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(_client().get_collection("UNKNOWN", request=_request()))
+
+    assert exc_info.value.status_code == 404
+    assert "unknown project" in exc_info.value.detail
+
+
+def test_get_item_raises_404_when_item_not_found(monkeypatch):
+    async def fake_get_item(self, item_id, collection_id, **kwargs):
+        raise _make_search_api_error(404)
+
+    monkeypatch.setattr(core_module.CoreClient, "get_item", fake_get_item)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            _client().get_item("missing-item", "CMIP6", request=_request())
+        )
+
+    assert exc_info.value.status_code == 404
+    assert "missing-item" in exc_info.value.detail
+
+
+def test_get_item_reraises_non_404_search_api_errors(monkeypatch):
+    async def fake_get_item(self, item_id, collection_id, **kwargs):
+        raise _make_search_api_error(500)
+
+    monkeypatch.setattr(core_module.CoreClient, "get_item", fake_get_item)
+
+    with pytest.raises(globus_sdk.SearchAPIError):
+        asyncio.run(_client().get_item("item-1", "CMIP6", request=_request()))
 
 
 def _make_search_api_error(status_code):

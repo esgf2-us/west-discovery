@@ -87,10 +87,27 @@ class GlobusSearchClient(CoreClient):
 
         return landing_page
 
+    async def get_item(self, item_id: str, collection_id: str, **kwargs):
+        try:
+            return await super().get_item(
+                item_id=item_id, collection_id=collection_id, **kwargs
+            )
+        except globus_sdk.SearchAPIError as e:
+            if e.http_status == 404:
+                raise HTTPException(
+                    status_code=404, detail=f"Item '{item_id}' not found"
+                )
+            raise
+
     async def get_collection(
         self, collection_id: str, **kwargs
     ) -> stac_types.Collection:
-        collection = await super().get_collection(collection_id=collection_id, **kwargs)
+        try:
+            collection = await super().get_collection(
+                collection_id=collection_id, **kwargs
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
         # Need to figure out a better way to do this —
         # the collection_id is embedded in the hrefs of
         # all links, so we need to update them to match
@@ -214,9 +231,11 @@ class GlobusSearchClient(CoreClient):
             cql2_filter = getattr(search_request, "filter_expr", None)
             try:
                 search = self.database.apply_cql2_filter(search, cql2_filter)
-            except Exception as e:
+            except NotImplementedError as e:
+                raise HTTPException(status_code=501, detail=str(e))
+            except (ValueError, KeyError, IndexError) as e:
                 raise HTTPException(
-                    status_code=400, detail=f"Error with cql2_json filter: {e}"
+                    status_code=400, detail=f"Malformed CQL2 filter: {e}"
                 )
 
         # Free-text filter

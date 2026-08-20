@@ -629,9 +629,16 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
 
         if aggregate_request:
             if aggregate_request.filter_expr:
-                search = self.database.apply_cql2_filter(
-                    search, aggregate_request.filter_expr
-                )
+                try:
+                    search = self.database.apply_cql2_filter(
+                        search, aggregate_request.filter_expr
+                    )
+                except NotImplementedError as e:
+                    raise HTTPException(status_code=501, detail=str(e))
+                except (ValueError, KeyError, IndexError) as e:
+                    raise HTTPException(
+                        status_code=400, detail=f"Malformed CQL2 filter: {e}"
+                    )
             aggregations = aggregate_request.aggregations
             collections = aggregate_request.collections
             size = aggregate_request.size

@@ -367,3 +367,51 @@ def test_aggregate_returns_empty_aggregations_without_facet_results():
     )
 
     assert result["aggregations"] == []
+
+
+def test_aggregate_wraps_cql2_filter_errors_in_http_400():
+    class BadFilterDatabase(FakeDatabase):
+        def apply_cql2_filter(self, search, filter_expr):
+            raise ValueError("bad filter")
+
+    aggregate_request = SimpleNamespace(
+        filter_expr={"op": "="},
+        aggregations=["total_count"],
+        collections=None,
+        size=10,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            _client(BadFilterDatabase()).aggregate(
+                aggregate_request=aggregate_request,
+                request=_request(),
+            )
+        )
+
+    assert exc_info.value.status_code == 400
+    assert "Malformed CQL2 filter" in exc_info.value.detail
+
+
+def test_aggregate_wraps_cql2_filter_not_implemented_in_http_501():
+    class BadFilterDatabase(FakeDatabase):
+        def apply_cql2_filter(self, search, filter_expr):
+            raise NotImplementedError("not supported")
+
+    aggregate_request = SimpleNamespace(
+        filter_expr={"op": "t_after"},
+        aggregations=["total_count"],
+        collections=None,
+        size=10,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            _client(BadFilterDatabase()).aggregate(
+                aggregate_request=aggregate_request,
+                request=_request(),
+            )
+        )
+
+    assert exc_info.value.status_code == 501
+    assert exc_info.value.detail == "not supported"

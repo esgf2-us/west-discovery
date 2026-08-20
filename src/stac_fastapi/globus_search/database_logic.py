@@ -9,7 +9,6 @@ import attrs
 import globus_sdk
 from stac_fastapi.core import serializers
 from starlette.concurrency import run_in_threadpool
-from starlette.exceptions import HTTPException
 from starlette.requests import Request
 
 from .config import settings
@@ -293,10 +292,7 @@ class DatabaseLogic:
     )
 
     async def find_collection(self, collection_id: str) -> dict:
-        try:
-            return await run_in_threadpool(get_project, collection_id)
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
+        return await run_in_threadpool(get_project, collection_id)
 
     async def get_all_collections(
         self, token: str | None, limit: int, request: Request
@@ -304,16 +300,9 @@ class DatabaseLogic:
         return await run_in_threadpool(list_projects)
 
     async def get_one_item(self, collection_id: str, item_id: str) -> dict:
-        try:
-            res = await run_in_threadpool(
-                _client.get_subject, settings.search_index_id, item_id
-            )
-        except globus_sdk.SearchAPIError as e:
-            if e.http_status == 404:
-                raise HTTPException(
-                    status_code=404, detail=f"Item '{item_id}' not found"
-                )
-            raise
+        res = await run_in_threadpool(
+            _client.get_subject, settings.search_index_id, item_id
+        )
         return search_doc_to_stac_item(res.data)
 
     @staticmethod
@@ -359,16 +348,11 @@ class DatabaseLogic:
     ):
         if filter_:
             search["filters"] = search.get("filters", [])
-            try:
-                search["filters"].append(
-                    cql_to_filter(
-                        filter_, collection_ids=_extract_collection_ids(search)
-                    )
+            search["filters"].append(
+                cql_to_filter(
+                    filter_, collection_ids=_extract_collection_ids(search)
                 )
-            except (ValueError, KeyError, IndexError) as e:
-                raise HTTPException(status_code=400, detail=f"Malformed CQL2 filter: {e}")
-            except NotImplementedError as e:
-                raise HTTPException(status_code=501, detail=str(e))
+            )
         return search
 
     @staticmethod
