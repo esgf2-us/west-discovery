@@ -414,9 +414,9 @@ def test_landing_page_includes_service_links(monkeypatch):
 
     page = asyncio.run(_client().landing_page(request=_request_with_app()))
 
-    service_desc = next(l for l in page["links"] if l["rel"] == "service-desc")
+    service_desc = next(link for link in page["links"] if link["rel"] == "service-desc")
     assert service_desc["href"] == "https://api.example.org/openapi.json"
-    service_doc = next(l for l in page["links"] if l["rel"] == "service-doc")
+    service_doc = next(link for link in page["links"] if link["rel"] == "service-doc")
     assert service_doc["href"] == "https://api.example.org/docs"
 
 
@@ -429,7 +429,7 @@ def test_landing_page_adds_child_link_for_each_project(monkeypatch):
 
     page = asyncio.run(_client().landing_page(request=_request_with_app()))
 
-    child_links = [l for l in page["links"] if l["rel"] == "child"]
+    child_links = [link for link in page["links"] if link["rel"] == "child"]
     assert len(child_links) == 2
     assert child_links[0]["href"] == "https://api.example.org/collections/cmip6"
     assert child_links[0]["title"] == "CMIP6"
@@ -444,7 +444,7 @@ def test_landing_page_uses_project_id_as_title_when_title_is_absent(monkeypatch)
 
     page = asyncio.run(_client().landing_page(request=_request_with_app()))
 
-    child_link = next(l for l in page["links"] if l["rel"] == "child")
+    child_link = next(link for link in page["links"] if link["rel"] == "child")
     assert child_link["title"] == "cmip6"
 
 
@@ -457,7 +457,7 @@ def test_landing_page_adds_queryables_link_when_filter_extension_is_enabled(monk
         )
     )
 
-    queryables_links = [l for l in page["links"] if l["rel"] == "queryables"]
+    queryables_links = [link for link in page["links"] if link["rel"] == "queryables"]
     assert len(queryables_links) == 1
     assert queryables_links[0]["href"] == "https://api.example.org/queryables"
 
@@ -467,7 +467,7 @@ def test_landing_page_omits_queryables_link_without_filter_extension(monkeypatch
 
     page = asyncio.run(_client().landing_page(request=_request_with_app()))
 
-    assert not any(l["rel"] == "queryables" for l in page["links"])
+    assert not any(link["rel"] == "queryables" for link in page["links"])
 
 
 def test_landing_page_adds_aggregate_links_when_aggregation_extension_is_enabled(
@@ -481,9 +481,9 @@ def test_landing_page_adds_aggregate_links_when_aggregation_extension_is_enabled
         )
     )
 
-    aggregate = next(l for l in page["links"] if l["rel"] == "aggregate")
+    aggregate = next(link for link in page["links"] if link["rel"] == "aggregate")
     assert aggregate["href"] == "https://api.example.org/aggregate"
-    aggregations = next(l for l in page["links"] if l["rel"] == "aggregations")
+    aggregations = next(link for link in page["links"] if link["rel"] == "aggregations")
     assert aggregations["href"] == "https://api.example.org/aggregations"
 
 
@@ -492,5 +492,5 @@ def test_landing_page_omits_aggregate_links_without_aggregation_extension(monkey
 
     page = asyncio.run(_client().landing_page(request=_request_with_app()))
 
-    assert not any(l["rel"] == "aggregate" for l in page["links"])
-    assert not any(l["rel"] == "aggregations" for l in page["links"])
+    assert not any(link["rel"] == "aggregate" for link in page["links"])
+    assert not any(link["rel"] == "aggregations" for link in page["links"])
