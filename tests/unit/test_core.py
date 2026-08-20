@@ -424,7 +424,10 @@ def test_landing_page_adds_child_link_for_each_project(monkeypatch):
     monkeypatch.setattr(
         core_module,
         "list_project_summaries",
-        lambda: [{"id": "cmip6", "title": "CMIP6"}, {"id": "obs4mips", "title": "obs4MIPs"}],
+        lambda: [
+            {"id": "cmip6", "title": "CMIP6"},
+            {"id": "obs4mips", "title": "obs4MIPs"},
+        ],
     )
 
     page = asyncio.run(_client().landing_page(request=_request_with_app()))
@@ -448,7 +451,9 @@ def test_landing_page_uses_project_id_as_title_when_title_is_absent(monkeypatch)
     assert child_link["title"] == "cmip6"
 
 
-def test_landing_page_adds_queryables_link_when_filter_extension_is_enabled(monkeypatch):
+def test_landing_page_adds_queryables_link_when_filter_extension_is_enabled(
+    monkeypatch,
+):
     monkeypatch.setattr(core_module, "list_project_summaries", lambda: [])
 
     page = asyncio.run(

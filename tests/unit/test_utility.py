@@ -238,9 +238,7 @@ def test_list_project_summaries_returns_id_and_title_for_each_project(monkeypatc
     ]
 
 
-def test_list_project_summaries_skips_projects_not_found_in_esgvoc(
-    monkeypatch, caplog
-):
+def test_list_project_summaries_skips_projects_not_found_in_esgvoc(monkeypatch, caplog):
     monkeypatch.setattr(utility.ev, "get_all_projects", lambda: ["cmip6", "unknown"])
 
     def fake_get_project(project_id):
@@ -259,13 +257,13 @@ def test_list_project_summaries_skips_projects_not_found_in_esgvoc(
 def test_list_project_summaries_skips_projects_without_catalog_specs(
     monkeypatch, caplog
 ):
-    monkeypatch.setattr(
-        utility.ev, "get_all_projects", lambda: ["cmip6", "incomplete"]
-    )
+    monkeypatch.setattr(utility.ev, "get_all_projects", lambda: ["cmip6", "incomplete"])
 
     def fake_get_project(project_id):
         if project_id == "incomplete":
-            return _project_summary_specs("incomplete", "Incomplete", has_catalog_specs=False)
+            return _project_summary_specs(
+                "incomplete", "Incomplete", has_catalog_specs=False
+            )
         return _project_summary_specs("cmip6", "CMIP6")
 
     monkeypatch.setattr(utility.ev, "get_project", fake_get_project)
