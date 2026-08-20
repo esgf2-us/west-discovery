@@ -1,7 +1,10 @@
 import asyncio
 from types import SimpleNamespace
 
+import globus_sdk
 import pytest
+import requests
+import requests.structures
 from fastapi import HTTPException
 from starlette.requests import Request
 
@@ -376,3 +379,59 @@ def test_post_search_wraps_free_text_errors_in_http_400():
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Error with free-text query: bad q"
+
+
+def _make_search_api_error(status_code):
+    resp = requests.models.Response()
+    resp.status_code = status_code
+    resp._content = b"{}"
+    resp.encoding = "utf-8"
+    req = requests.models.PreparedRequest()
+    req.method = "GET"
+    req.url = "https://example.com"
+    req.headers = requests.structures.CaseInsensitiveDict()
+    resp.request = req
+    return globus_sdk.SearchAPIError(resp)
+
+
+class SearchAPIErrorDatabase(FakeDatabase):
+    def __init__(self, status_code):
+        super().__init__()
+        self._status_code = status_code
+
+    async def execute_search(self, **kwargs):
+        raise _make_search_api_error(self._status_code)
+
+
+@pytest.mark.parametrize(
+    ("api_status", "expected_status"),
+    [
+        (400, 400),
+        (404, 404),
+        (401, 401),
+        (403, 403),
+    ],
+)
+def test_item_collection_maps_search_api_error_to_http(api_status, expected_status):
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            _client(SearchAPIErrorDatabase(api_status)).item_collection(
+                "CMIP6",
+                request=_request(path="/collections/CMIP6/items"),
+            )
+        )
+
+    assert exc_info.value.status_code == expected_status
+
+
+def test_item_collection_raises_502_for_other_search_api_errors():
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            _client(SearchAPIErrorDatabase(500)).item_collection(
+                "CMIP6",
+                request=_request(path="/collections/CMIP6/items"),
+            )
+        )
+
+    assert exc_info.value.status_code == 502
+    assert "Upstream search error" in exc_info.value.detail

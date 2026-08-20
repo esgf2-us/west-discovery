@@ -413,22 +413,9 @@ class DatabaseLogic:
 
         if token:
             search.set_marker(token)
-        try:
-            response = await run_in_threadpool(
-                _client.scroll, settings.search_index_id, search
-            )
-        except globus_sdk.SearchAPIError as e:
-            if e.http_status == 400:
-                raise HTTPException(status_code=400, detail=e.message)
-            if e.http_status == 404:
-                raise HTTPException(status_code=404, detail="Search index not found")
-            if e.http_status in (401, 403):
-                raise HTTPException(
-                    status_code=e.http_status, detail="Access denied to search index"
-                )
-            raise HTTPException(
-                status_code=502, detail=f"Upstream search error: {e.message}"
-            )
+        response = await run_in_threadpool(
+            _client.scroll, settings.search_index_id, search
+        )
         return (
             [search_doc_to_stac_item(doc) for doc in response["gmeta"]],
             response["total"],

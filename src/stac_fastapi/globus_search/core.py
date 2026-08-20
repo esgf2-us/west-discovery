@@ -1,6 +1,7 @@
 from typing import Optional
 from urllib.parse import urljoin, urlparse
 
+import globus_sdk
 from fastapi import HTTPException
 from stac_fastapi.core.core import CoreClient
 from stac_fastapi.core.models.links import PagingLinks
@@ -126,13 +127,26 @@ class GlobusSearchClient(CoreClient):
                 search=search, collection_ids=[collection_id]
             )
 
-        items, total, next_marker = await self.database.execute_search(
-            search=search,
-            limit=limit,
-            token=token,
-            sort=None,
-            collection_ids=[collection_id],
-        )
+        try:
+            items, total, next_marker = await self.database.execute_search(
+                search=search,
+                limit=limit,
+                token=token,
+                sort=None,
+                collection_ids=[collection_id],
+            )
+        except globus_sdk.SearchAPIError as e:
+            if e.http_status == 400:
+                raise HTTPException(status_code=400, detail=e.message)
+            if e.http_status == 404:
+                raise HTTPException(status_code=404, detail="Search index not found")
+            if e.http_status in (401, 403):
+                raise HTTPException(
+                    status_code=e.http_status, detail="Access denied to search index"
+                )
+            raise HTTPException(
+                status_code=502, detail=f"Upstream search error: {e.message}"
+            )
 
         links = await PagingLinks(request=request, next=next_marker).get_links()
 
@@ -225,13 +239,26 @@ class GlobusSearchClient(CoreClient):
         limit = getattr(search_request, "limit", 10)
         token = getattr(search_request, "token", None)
 
-        items, total, next_marker = await self.database.execute_search(
-            search=search,
-            limit=limit,
-            token=token,
-            sort=None,
-            collection_ids=search_request.collections,
-        )
+        try:
+            items, total, next_marker = await self.database.execute_search(
+                search=search,
+                limit=limit,
+                token=token,
+                sort=None,
+                collection_ids=search_request.collections,
+            )
+        except globus_sdk.SearchAPIError as e:
+            if e.http_status == 400:
+                raise HTTPException(status_code=400, detail=e.message)
+            if e.http_status == 404:
+                raise HTTPException(status_code=404, detail="Search index not found")
+            if e.http_status in (401, 403):
+                raise HTTPException(
+                    status_code=e.http_status, detail="Access denied to search index"
+                )
+            raise HTTPException(
+                status_code=502, detail=f"Upstream search error: {e.message}"
+            )
 
         links = await PagingLinks(request=request, next=next_marker).get_links()
 
