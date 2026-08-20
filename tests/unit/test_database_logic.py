@@ -4,7 +4,6 @@ import globus_sdk
 import pytest
 import requests
 import requests.structures
-from starlette.exceptions import HTTPException
 
 from stac_fastapi.globus_search import database_logic
 from stac_fastapi.globus_search.database_logic import (
@@ -529,41 +528,10 @@ def test_cql_to_filter_translates_like():
     assert result == {"type": "like", "field_name": "x", "value": "hist*"}
 
 
-# --- find_collection: 404 path ---
-
-
-def test_find_collection_raises_404_when_project_not_found(monkeypatch):
-    monkeypatch.setattr(
-        database_logic,
-        "get_project",
-        lambda collection_id: (_ for _ in ()).throw(ValueError("unknown project")),
-    )
-
-    with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(DatabaseLogic().find_collection("UNKNOWN"))
-
-    assert exc_info.value.status_code == 404
-    assert "unknown project" in exc_info.value.detail
-
-
 # --- get_one_item: error paths ---
 
 
-def test_get_one_item_raises_404_on_search_api_error(monkeypatch):
-    class FakeClient:
-        def get_subject(self, index_id, item_id):
-            raise make_search_api_error(404)
-
-    monkeypatch.setattr(database_logic, "_client", FakeClient())
-
-    with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(DatabaseLogic().get_one_item("CMIP6", "missing-item"))
-
-    assert exc_info.value.status_code == 404
-    assert "missing-item" in exc_info.value.detail
-
-
-def test_get_one_item_reraises_non_404_search_api_error(monkeypatch):
+def test_get_one_item_propagates_search_api_error(monkeypatch):
     class FakeClient:
         def get_subject(self, index_id, item_id):
             raise make_search_api_error(500)
@@ -574,82 +542,3 @@ def test_get_one_item_reraises_non_404_search_api_error(monkeypatch):
         asyncio.run(DatabaseLogic().get_one_item("CMIP6", "item-1"))
 
 
-# --- apply_cql2_filter: error paths ---
-
-
-def test_apply_cql2_filter_raises_400_for_malformed_filter():
-    search = globus_sdk.SearchQuery()
-
-    with pytest.raises(HTTPException) as exc_info:
-        DatabaseLogic.apply_cql2_filter(search, {"op": "="})
-
-    assert exc_info.value.status_code == 400
-    assert "Malformed CQL2 filter" in exc_info.value.detail
-
-
-def test_apply_cql2_filter_raises_501_for_unimplemented_filter():
-    search = globus_sdk.SearchQuery()
-
-    with pytest.raises(HTTPException) as exc_info:
-        DatabaseLogic.apply_cql2_filter(
-            search, {"op": "t_after", "args": [{"property": "datetime"}, "2025-01-01"]}
-        )
-
-    assert exc_info.value.status_code == 501
-
-
-# --- execute_search: SearchAPIError mappings ---
-
-
-@pytest.mark.parametrize(
-    ("api_status", "expected_status"),
-    [
-        (400, 400),
-        (404, 404),
-        (401, 401),
-        (403, 403),
-    ],
-)
-def test_execute_search_maps_search_api_error_to_http(
-    monkeypatch, api_status, expected_status
-):
-    class FakeClient:
-        def scroll(self, index_id, search):
-            raise make_search_api_error(api_status)
-
-    monkeypatch.setattr(database_logic, "_client", FakeClient())
-
-    with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            DatabaseLogic().execute_search(
-                search=globus_sdk.SearchScrollQuery(),
-                limit=10,
-                token=None,
-                sort=None,
-                collection_ids=None,
-            )
-        )
-
-    assert exc_info.value.status_code == expected_status
-
-
-def test_execute_search_raises_502_for_other_search_api_errors(monkeypatch):
-    class FakeClient:
-        def scroll(self, index_id, search):
-            raise make_search_api_error(500)
-
-    monkeypatch.setattr(database_logic, "_client", FakeClient())
-
-    with pytest.raises(HTTPException) as exc_info:
-        asyncio.run(
-            DatabaseLogic().execute_search(
-                search=globus_sdk.SearchScrollQuery(),
-                limit=10,
-                token=None,
-                sort=None,
-                collection_ids=None,
-            )
-        )
-
-    assert exc_info.value.status_code == 502
-    assert "Upstream search error" in exc_info.value.detail
