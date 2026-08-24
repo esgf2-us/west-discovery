@@ -514,6 +514,31 @@ def test_apply_cql2_filter_detects_collection_prefix_past_non_matching_filters()
     }
 
 
+def test_cql_to_filter_raises_when_bare_property_has_no_collection():
+    with pytest.raises(ValueError, match="exactly one collection"):
+        cql_to_filter({"op": "=", "args": [{"property": "activity_id"}, "CMIP"]})
+
+
+def test_cql_to_filter_raises_when_bare_property_has_multiple_collections():
+    with pytest.raises(ValueError, match="exactly one collection"):
+        cql_to_filter(
+            {"op": "like", "args": [{"property": "experiment_id"}, "hist%"]},
+            collection_ids=["CMIP6", "CMIP7"],
+        )
+
+
+def test_apply_cql2_filter_rejects_property_filter_without_single_collection():
+    search = globus_sdk.SearchQuery()
+    search["filters"] = [
+        {"type": "match_any", "field_name": "collection", "values": ["CMIP6", "CMIP7"]}
+    ]
+
+    with pytest.raises(ValueError, match="exactly one collection"):
+        DatabaseLogic.apply_cql2_filter(
+            search, {"op": "=", "args": [{"property": "activity_id"}, "CMIP"]}
+        )
+
+
 def test_execute_search_propagates_search_api_error(monkeypatch):
     r = MagicMock()
     r.status_code = 503
