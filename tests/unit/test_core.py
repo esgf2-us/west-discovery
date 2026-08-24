@@ -184,8 +184,8 @@ def test_item_collection_applies_collection_filter_and_query_token():
     assert execute_call[1]["collection_ids"] == ["CMIP6"]
     assert item_collection["type"] == "FeatureCollection"
     assert item_collection["features"] == [{"id": "item-1", "links": []}]
-    assert item_collection["numReturned"] == 1
-    assert item_collection["numMatched"] == 12
+    assert item_collection["numberReturned"] == 1
+    assert item_collection["numberMatched"] == 12
     assert item_collection["context"] == {"matched": 12}
     assert item_collection["links"][0]["rel"] == "next"
 
@@ -303,7 +303,7 @@ def test_post_search_applies_request_filters_and_pagination():
     assert execute_call[1]["token"] == "page-2"
     assert execute_call[1]["collection_ids"] == ["CMIP6"]
     assert item_collection["features"] == [{"id": "item-1"}]
-    assert item_collection["numMatched"] == 7
+    assert item_collection["numberMatched"] == 7
     assert item_collection["links"][0]["rel"] == "next"
     assert search_request.query is None
     assert search_request.sortby is None
