@@ -183,8 +183,8 @@ class GlobusSearchClient(CoreClient):
             type="FeatureCollection",
             features=items,
             links=links,
-            numReturned=len(items),
-            numMatched=total,
+            numberReturned=len(items),
+            numberMatched=total,
             context={"matched": total},
         )
 
@@ -285,7 +285,7 @@ class GlobusSearchClient(CoreClient):
             type="FeatureCollection",
             features=items,
             links=links,
-            numReturned=len(items),
-            numMatched=total,
+            numberReturned=len(items),
+            numberMatched=total,
             context={"matched": total},
         )

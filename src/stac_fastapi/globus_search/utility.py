@@ -61,6 +61,8 @@ def _build_project(project_id: str = "cmip6") -> dict:
     Compatible with esgvoc >= 4.0.0.
     """
     # ── 1. Project-level metadata ─────────────────────────────────────────────
+    if project_id == "CMIP6Test":
+        project_id = "cmip6"  # alias for CMIP6Test in esgvoc 4.0.0
     specs = ev.get_project(project_id.lower())
     if specs is None:
         raise ValueError(f"Project '{project_id}' not found in esgvoc")
