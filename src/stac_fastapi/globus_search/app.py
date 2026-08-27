@@ -76,7 +76,11 @@ route_dependencies = [
         [cache(max_age=300, public=True)],
     ),
     (
-        [{"path": "/search", "method": "POST"}],
+        [
+            {"path": "/aggregate", "method": "POST"},
+            {"path": "/collections/{collection_id}/aggregate", "method": "POST"},
+            {"path": "/search", "method": "POST"},
+        ],
         [Depends(require_json)],
     ),
 ]
