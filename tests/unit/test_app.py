@@ -77,10 +77,14 @@ def test_app_configures_cached_collection_items_route():
     assert getattr(dependencies[0], "dependency").__name__ == "add_cache_headers"
 
 
-def test_app_wires_require_json_on_post_search():
+def test_app_wires_require_json_on_post_routes():
     paths, dependencies = app.route_dependencies[1]
 
-    assert paths == [{"path": "/search", "method": "POST"}]
+    assert paths == [
+        {"path": "/aggregate", "method": "POST"},
+        {"path": "/collections/{collection_id}/aggregate", "method": "POST"},
+        {"path": "/search", "method": "POST"},
+    ]
     assert len(dependencies) == 1
     assert getattr(dependencies[0], "dependency").__name__ == "require_json"
 
