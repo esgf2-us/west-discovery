@@ -399,9 +399,7 @@ class DatabaseLogic:
         if filter_:
             search["filters"] = search.get("filters", [])
             search["filters"].append(
-                cql_to_filter(
-                    filter_, collection_ids=_extract_collection_ids(search)
-                )
+                cql_to_filter(filter_, collection_ids=_extract_collection_ids(search))
             )
         return search
 

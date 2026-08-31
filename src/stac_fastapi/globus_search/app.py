@@ -18,11 +18,11 @@ from stac_fastapi.extensions.core import (
     TokenPaginationExtension,
 )
 from stac_fastapi.extensions.core.free_text import FreeTextConformanceClasses
-from stac_fastapi.sfeos_helpers.filter import EsAsyncBaseFiltersClient
 from stac_fastapi.types.config import ApiSettings
 
 from stac_fastapi.globus_search.config import settings
 from stac_fastapi.globus_search.core import GlobusSearchClient
+from stac_fastapi.globus_search.filter import GlobusSearchFiltersClient
 from stac_fastapi.globus_search.database_logic import DatabaseLogic
 from stac_fastapi.globus_search.extensions.aggregration import (
     GlobusAggregationExtensionGetRequest,
@@ -31,6 +31,7 @@ from stac_fastapi.globus_search.extensions.aggregration import (
 from stac_fastapi.globus_search.extensions.aggregration.client import (
     GlobusSearchAggregationClient,
 )
+
 
 async def require_json(content_type: str = Header(..., alias="content-type")):
     if not content_type.startswith("application/json"):
@@ -49,9 +50,7 @@ aggregation_extension = AggregationExtension(
 aggregation_extension.POST = GlobusAggregationExtensionPostRequest
 aggregation_extension.GET = GlobusAggregationExtensionGetRequest
 
-filter_extension = FilterExtension(
-    client=EsAsyncBaseFiltersClient(database=database_logic)
-)
+filter_extension = FilterExtension(client=GlobusSearchFiltersClient())
 filter_extension.conformance_classes.append(
     "http://www.opengis.net/spec/cql2/1.0/conf/advanced-comparison-operators"
 )

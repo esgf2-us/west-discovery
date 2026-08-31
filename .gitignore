@@ -66,6 +66,7 @@ dmypy.json
 *.log
 
 cache/
+.ruff_cache/
 
 # Claude Code / agent tooling
 .claude/
