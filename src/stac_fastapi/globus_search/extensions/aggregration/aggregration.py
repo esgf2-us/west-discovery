@@ -5,9 +5,13 @@ from typing import Optional
 import attr
 from fastapi import Path
 from stac_fastapi.extensions.core.aggregation.request import (
-    AggregationExtensionGetRequest, AggregationExtensionPostRequest)
+    AggregationExtensionGetRequest,
+    AggregationExtensionPostRequest,
+)
 from stac_fastapi.extensions.core.filter.request import (
-    FilterExtensionGetRequest, FilterExtensionPostRequest)
+    FilterExtensionGetRequest,
+    FilterExtensionPostRequest,
+)
 from typing_extensions import Annotated
 
 
