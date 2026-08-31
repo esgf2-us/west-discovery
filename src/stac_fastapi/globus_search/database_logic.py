@@ -9,7 +9,6 @@ import attrs
 import globus_sdk
 from stac_fastapi.core import serializers
 from starlette.concurrency import run_in_threadpool
-from starlette.exceptions import HTTPException
 from starlette.requests import Request
 
 from .config import settings
@@ -102,7 +101,7 @@ def cql_to_filter(
       https://docs.ogc.org/DRAFTS/21-065.html#temporal-functions
     """
     if "op" not in cql_query:
-        return {}
+        raise ValueError("CQL2 filter must include an 'op' field")
     cql_op = cql_query["op"]
 
     # each group of matches is marked with one of the following qualifiers:
@@ -146,7 +145,10 @@ def cql_to_filter(
             #
             # We have made the single arg assumption for several of these
             # without checks that it is true.
-            assert len(cql_query["args"]) == 2
+            if len(cql_query["args"]) != 2:
+                raise ValueError(
+                    f"'=' filter requires exactly 2 arguments, got {len(cql_query['args'])}"
+                )
 
             return {
                 "type": "match_any",
@@ -157,7 +159,10 @@ def cql_to_filter(
             }
         case "<>":
             # 'not match_all', see comments in '=' above
-            assert len(cql_query["args"]) == 2
+            if len(cql_query["args"]) != 2:
+                raise ValueError(
+                    f"'<>' filter requires exactly 2 arguments, got {len(cql_query['args'])}"
+                )
 
             return {
                 "type": "not",
@@ -208,7 +213,10 @@ def cql_to_filter(
             }
         # ADVANCED COMPARISON OPERATORS (???)
         case "like":
-            assert len(cql_query["args"]) == 2
+            if len(cql_query["args"]) != 2:
+                raise ValueError(
+                    f"'like' filter requires exactly 2 arguments, got {len(cql_query['args'])}"
+                )
 
             value = cql_query["args"][1]
 
@@ -391,7 +399,9 @@ class DatabaseLogic:
         if filter_:
             search["filters"] = search.get("filters", [])
             search["filters"].append(
-                cql_to_filter(filter_, collection_ids=_extract_collection_ids(search))
+                cql_to_filter(
+                    filter_, collection_ids=_extract_collection_ids(search)
+                )
             )
         return search
 
@@ -437,14 +447,9 @@ class DatabaseLogic:
 
         if token:
             search.set_marker(token)
-        try:
-            response = await run_in_threadpool(
-                _client.scroll, settings.search_index_id, search
-            )
-        except globus_sdk.SearchAPIError as e:
-            if e.http_status == 400:
-                raise HTTPException(status_code=400, detail=e.message)
-            raise
+        response = await run_in_threadpool(
+            _client.scroll, settings.search_index_id, search
+        )
         return (
             [search_doc_to_stac_item(doc) for doc in response["gmeta"]],
             response["total"],

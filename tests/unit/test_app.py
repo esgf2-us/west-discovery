@@ -1,3 +1,4 @@
+import asyncio
 import builtins
 import sys
 from types import SimpleNamespace
@@ -5,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 from hishel.asgi import ASGICacheMiddleware
 from stac_fastapi.api.app import StacApi
+from starlette.exceptions import HTTPException
 from stac_fastapi.extensions.core import (
     AggregationExtension,
     FilterExtension,
@@ -73,6 +75,27 @@ def test_app_configures_cached_collection_items_route():
     assert paths == [{"path": "/collections/{collection_id}/items", "method": "GET"}]
     assert len(dependencies) == 1
     assert getattr(dependencies[0], "dependency").__name__ == "add_cache_headers"
+
+
+def test_app_wires_require_json_on_post_search():
+    paths, dependencies = app.route_dependencies[1]
+
+    assert paths == [{"path": "/search", "method": "POST"}]
+    assert len(dependencies) == 1
+    assert getattr(dependencies[0], "dependency").__name__ == "require_json"
+
+
+def test_require_json_passes_for_application_json():
+    asyncio.run(app.require_json("application/json"))
+    asyncio.run(app.require_json("application/json; charset=utf-8"))
+
+
+@pytest.mark.parametrize("content_type", ["text/plain", "application/xml", ""])
+def test_require_json_raises_415_for_non_json_content_type(content_type):
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(app.require_json(content_type))
+
+    assert exc_info.value.status_code == 415
 
 
 def test_run_calls_uvicorn_with_settings(monkeypatch):

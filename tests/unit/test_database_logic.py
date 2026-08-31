@@ -3,6 +3,8 @@ from unittest.mock import MagicMock
 
 import globus_sdk
 import pytest
+import requests
+import requests.structures
 
 from stac_fastapi.globus_search import database_logic
 from stac_fastapi.globus_search.database_logic import (
@@ -10,6 +12,19 @@ from stac_fastapi.globus_search.database_logic import (
     cql_like_to_globus_like,
     cql_to_filter,
 )
+
+
+def make_search_api_error(status_code):
+    resp = requests.models.Response()
+    resp.status_code = status_code
+    resp._content = b"{}"
+    resp.encoding = "utf-8"
+    req = requests.models.PreparedRequest()
+    req.method = "GET"
+    req.url = "https://example.com"
+    req.headers = requests.structures.CaseInsensitiveDict()
+    resp.request = req
+    return globus_sdk.SearchAPIError(resp)
 
 
 @pytest.mark.parametrize(
@@ -27,7 +42,6 @@ def test_cql_like_to_globus_like(pattern, expected):
 @pytest.mark.parametrize(
     ("cql_query", "expected"),
     [
-        ({}, {}),
         (
             {"op": "=", "args": [{"property": "collection"}, "CMIP6"]},
             {
@@ -484,6 +498,44 @@ def test_execute_search_sets_pagination_token(monkeypatch):
     )
 
     assert result == ([], 0, None)
+
+
+# --- cql_to_filter: new ValueError paths ---
+
+
+def test_cql_to_filter_raises_value_error_for_missing_op():
+    with pytest.raises(ValueError, match="'op' field"):
+        cql_to_filter({})
+
+
+@pytest.mark.parametrize("operator", ["=", "<>"])
+def test_cql_to_filter_raises_value_error_for_wrong_arg_count(operator):
+    with pytest.raises(ValueError, match="exactly 2 arguments"):
+        cql_to_filter({"op": operator, "args": [{"property": "x"}]})
+
+
+def test_cql_to_filter_raises_value_error_for_like_wrong_arg_count():
+    with pytest.raises(ValueError, match="exactly 2 arguments"):
+        cql_to_filter({"op": "like", "args": [{"property": "x"}]})
+
+
+def test_cql_to_filter_raises_value_error_for_like_non_string_pattern():
+    with pytest.raises(ValueError, match="string pattern"):
+        cql_to_filter({"op": "like", "args": [{"property": "x"}, 42]})
+
+
+# --- get_one_item: error paths ---
+
+
+def test_get_one_item_propagates_search_api_error(monkeypatch):
+    class FakeClient:
+        def get_subject(self, index_id, item_id):
+            raise make_search_api_error(500)
+
+    monkeypatch.setattr(database_logic, "_client", FakeClient())
+
+    with pytest.raises(globus_sdk.SearchAPIError):
+        asyncio.run(DatabaseLogic().get_one_item("CMIP6", "item-1"))
 
 
 def test_cql_like_to_globus_like_raises_on_trailing_escape():

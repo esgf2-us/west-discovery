@@ -6,6 +6,8 @@ stac-fastapi.
 from hishel import AsyncSqliteStorage
 from hishel.asgi import ASGICacheMiddleware
 from hishel.fastapi import cache
+from fastapi import Depends, Header
+from starlette.exceptions import HTTPException
 from stac_fastapi.api.app import StacApi
 from stac_fastapi.api.models import create_get_request_model, create_post_request_model
 from stac_fastapi.core.session import Session
@@ -29,6 +31,14 @@ from stac_fastapi.globus_search.extensions.aggregration import (
 from stac_fastapi.globus_search.extensions.aggregration.client import (
     GlobusSearchAggregationClient,
 )
+
+async def require_json(content_type: str = Header(..., alias="content-type")):
+    if not content_type.startswith("application/json"):
+        raise HTTPException(
+            status_code=415,
+            detail="Content-Type must be application/json",
+        )
+
 
 database_logic = DatabaseLogic()
 session = Session.create_from_settings(ApiSettings())
@@ -64,7 +74,15 @@ route_dependencies = [
     (
         [{"path": "/collections/{collection_id}/items", "method": "GET"}],
         [cache(max_age=300, public=True)],
-    )
+    ),
+    (
+        [
+            {"path": "/aggregate", "method": "POST"},
+            {"path": "/collections/{collection_id}/aggregate", "method": "POST"},
+            {"path": "/search", "method": "POST"},
+        ],
+        [Depends(require_json)],
+    ),
 ]
 
 api = StacApi(
