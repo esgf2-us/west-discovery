@@ -6,9 +6,7 @@ from fastapi import HTTPException
 from starlette.requests import Request
 
 from stac_fastapi.globus_search.extensions.aggregration.client import (
-    GlobusSearchAggregationClient,
-    find_first_non_alphanumeric,
-)
+    GlobusSearchAggregationClient, find_first_non_alphanumeric)
 
 
 def _request(path="/aggregations", host="api.example.org"):

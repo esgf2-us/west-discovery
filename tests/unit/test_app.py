@@ -6,25 +6,20 @@ from types import SimpleNamespace
 import pytest
 from hishel.asgi import ASGICacheMiddleware
 from stac_fastapi.api.app import StacApi
-from starlette.exceptions import HTTPException
-from stac_fastapi.extensions.core import (
-    AggregationExtension,
-    FilterExtension,
-    FreeTextExtension,
-    TokenPaginationExtension,
-)
+from stac_fastapi.extensions.core import (AggregationExtension,
+                                          FilterExtension, FreeTextExtension,
+                                          TokenPaginationExtension)
 from stac_fastapi.extensions.core.free_text import FreeTextConformanceClasses
+from starlette.exceptions import HTTPException
 
 from stac_fastapi.globus_search import app
 from stac_fastapi.globus_search.core import GlobusSearchClient
 from stac_fastapi.globus_search.database_logic import DatabaseLogic
 from stac_fastapi.globus_search.extensions.aggregration import (
     GlobusAggregationExtensionGetRequest,
-    GlobusAggregationExtensionPostRequest,
-)
-from stac_fastapi.globus_search.extensions.aggregration.client import (
-    GlobusSearchAggregationClient,
-)
+    GlobusAggregationExtensionPostRequest)
+from stac_fastapi.globus_search.extensions.aggregration.client import \
+    GlobusSearchAggregationClient
 
 
 def test_app_wires_database_session_client_and_handler():
@@ -77,10 +72,14 @@ def test_app_configures_cached_collection_items_route():
     assert getattr(dependencies[0], "dependency").__name__ == "add_cache_headers"
 
 
-def test_app_wires_require_json_on_post_search():
+def test_app_wires_require_json_on_post_routes():
     paths, dependencies = app.route_dependencies[1]
 
-    assert paths == [{"path": "/search", "method": "POST"}]
+    assert paths == [
+        {"path": "/aggregate", "method": "POST"},
+        {"path": "/collections/{collection_id}/aggregate", "method": "POST"},
+        {"path": "/search", "method": "POST"},
+    ]
     assert len(dependencies) == 1
     assert getattr(dependencies[0], "dependency").__name__ == "require_json"
 
