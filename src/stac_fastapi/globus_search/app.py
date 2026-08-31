@@ -50,7 +50,9 @@ aggregation_extension = AggregationExtension(
 aggregation_extension.POST = GlobusAggregationExtensionPostRequest
 aggregation_extension.GET = GlobusAggregationExtensionGetRequest
 
-filter_extension = FilterExtension(client=GlobusSearchFiltersClient())
+filter_extension = FilterExtension(
+    client=GlobusSearchFiltersClient(database=database_logic)
+)
 filter_extension.conformance_classes.append(
     "http://www.opengis.net/spec/cql2/1.0/conf/advanced-comparison-operators"
 )
