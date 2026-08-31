@@ -34,9 +34,9 @@ def _build_esgvoc_queryables(collection_id: str) -> Dict[str, Any]:
         if key in DEFAULT_QUERYABLES:
             continue
         result[key] = {
-                "type": field_schema.get("type", "string"),
-                "title": key.replace("_", " ").title(),
-            }
+            "type": field_schema.get("type", "string"),
+            "title": key.replace("_", " ").title(),
+        }
 
     return result
 
@@ -83,7 +83,8 @@ class GlobusSearchFiltersClient(AsyncBaseFiltersClient):
 
         return {
             "$schema": "https://json-schema.org/draft/2019-09/schema",
-            "$id": request_url or f"https://stac-api.example.com/collections/{collection_id}/queryables",
+            "$id": request_url
+            or f"https://stac-api.example.com/collections/{collection_id}/queryables",
             "type": "object",
             "title": f"Queryables for {collection_id}",
             "description": (

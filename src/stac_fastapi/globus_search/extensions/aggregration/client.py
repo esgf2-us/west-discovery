@@ -12,10 +12,13 @@ import attrs
 import globus_sdk
 from fastapi import HTTPException
 from stac_fastapi.core.base_database_logic import BaseDatabaseLogic
-from stac_fastapi.core.extensions.aggregation import EsAggregationExtensionPostRequest
+from stac_fastapi.core.extensions.aggregation import \
+    EsAggregationExtensionPostRequest
 from stac_fastapi.core.session import Session
-from stac_fastapi.extensions.core.aggregation.client import BaseAggregationClient
-from stac_fastapi.extensions.core.aggregation.types import AggregationCollection
+from stac_fastapi.extensions.core.aggregation.client import \
+    BaseAggregationClient
+from stac_fastapi.extensions.core.aggregation.types import \
+    AggregationCollection
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 

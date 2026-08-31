@@ -5,7 +5,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from stac_fastapi.core.extensions.filter import DEFAULT_QUERYABLES
 
-from stac_fastapi.globus_search.filter import GlobusSearchFiltersClient, _infer_json_schema_type
+from stac_fastapi.globus_search.filter import (GlobusSearchFiltersClient,
+                                               _infer_json_schema_type)
 
 
 def _make_database(items=None):
@@ -149,7 +150,11 @@ def test_collection_queryables_infers_types_from_item_values(db):
 def test_collection_queryables_does_not_overwrite_default_queryables(db):
     db.execute_search = AsyncMock(
         return_value=(
-            [_make_item({"datetime": "2020-01-01T00:00:00Z", "cmip6:variable_id": "tas"})],
+            [
+                _make_item(
+                    {"datetime": "2020-01-01T00:00:00Z", "cmip6:variable_id": "tas"}
+                )
+            ],
             1,
             None,
         )
@@ -171,10 +176,14 @@ def test_collection_queryables_schema_structure(client):
 
 
 def test_collection_queryables_id_uses_request_url_when_present(db):
-    fake_request = SimpleNamespace(url="https://api.example.org/collections/CMIP6/queryables")
+    fake_request = SimpleNamespace(
+        url="https://api.example.org/collections/CMIP6/queryables"
+    )
     client = GlobusSearchFiltersClient(database=db)
 
-    result = asyncio.run(client.get_queryables(collection_id="CMIP6", request=fake_request))
+    result = asyncio.run(
+        client.get_queryables(collection_id="CMIP6", request=fake_request)
+    )
 
     assert result["$id"] == "https://api.example.org/collections/CMIP6/queryables"
 
