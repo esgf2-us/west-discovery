@@ -7,11 +7,10 @@ import requests
 import requests.structures
 
 from stac_fastapi.globus_search import database_logic
-from stac_fastapi.globus_search.database_logic import (
-    DatabaseLogic,
-    cql_like_to_globus_like,
-    cql_to_filter,
-)
+from stac_fastapi.globus_search.database_logic import (DatabaseLogic,
+                                                       cql_like_to_globus_like,
+                                                       cql_to_filter,
+                                                       parse_datetime_interval)
 
 
 def make_search_api_error(status_code):
@@ -615,3 +614,95 @@ def test_execute_search_propagates_search_api_error(monkeypatch):
                 collection_ids=None,
             )
         )
+
+
+# --- datetime parsing and filtering ---
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("2020-06-01T00:00:00Z", ("2020-06-01T00:00:00Z", "2020-06-01T00:00:00Z")),
+        ("1850-01-01/2015-01-01", ("1850-01-01", "2015-01-01")),
+        ("../2015-01-01", (None, "2015-01-01")),
+        ("1850-01-01/..", ("1850-01-01", None)),
+        ("/", (None, None)),
+        (None, (None, None)),
+    ],
+)
+def test_parse_datetime_interval(value, expected):
+    assert parse_datetime_interval(value) == expected
+
+
+def test_apply_datetime_filter_closed_interval_intersects_on_start_and_end():
+    search = globus_sdk.SearchQuery()
+
+    DatabaseLogic.apply_datetime_filter(search, "1850-01-01/2015-01-01")
+
+    assert search["filters"] == [
+        {
+            "type": "range",
+            "field_name": "properties.start_datetime",
+            "values": [{"from": "*", "to": "2015-01-01"}],
+        },
+        {
+            "type": "range",
+            "field_name": "properties.end_datetime",
+            "values": [{"from": "1850-01-01", "to": "*"}],
+        },
+    ]
+
+
+def test_apply_datetime_filter_single_instant_bounds_both_fields():
+    search = globus_sdk.SearchQuery()
+
+    DatabaseLogic.apply_datetime_filter(search, "2000-01-01T00:00:00Z")
+
+    assert search["filters"] == [
+        {
+            "type": "range",
+            "field_name": "properties.start_datetime",
+            "values": [{"from": "*", "to": "2000-01-01T00:00:00Z"}],
+        },
+        {
+            "type": "range",
+            "field_name": "properties.end_datetime",
+            "values": [{"from": "2000-01-01T00:00:00Z", "to": "*"}],
+        },
+    ]
+
+
+def test_apply_datetime_filter_open_start_only_constrains_start_datetime():
+    search = globus_sdk.SearchQuery()
+
+    DatabaseLogic.apply_datetime_filter(search, "../2015-01-01")
+
+    assert search["filters"] == [
+        {
+            "type": "range",
+            "field_name": "properties.start_datetime",
+            "values": [{"from": "*", "to": "2015-01-01"}],
+        },
+    ]
+
+
+def test_apply_datetime_filter_open_end_only_constrains_end_datetime():
+    search = globus_sdk.SearchQuery()
+
+    DatabaseLogic.apply_datetime_filter(search, "1850-01-01/..")
+
+    assert search["filters"] == [
+        {
+            "type": "range",
+            "field_name": "properties.end_datetime",
+            "values": [{"from": "1850-01-01", "to": "*"}],
+        },
+    ]
+
+
+def test_apply_datetime_filter_fully_open_adds_no_filters():
+    search = globus_sdk.SearchQuery()
+
+    DatabaseLogic.apply_datetime_filter(search, "/")
+
+    assert search.get("filters", []) == []

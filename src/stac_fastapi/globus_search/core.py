@@ -209,9 +209,8 @@ class GlobusSearchClient(CoreClient):
             )
 
         if search_request.datetime:
-            datetime_search = self._return_date(search_request.datetime)
             search = self.database.apply_datetime_filter(
-                search=search, datetime_search=datetime_search
+                search=search, datetime_search=search_request.datetime
             )
 
         if search_request.bbox:
