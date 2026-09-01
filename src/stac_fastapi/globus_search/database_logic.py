@@ -332,6 +332,42 @@ def cql_to_filter(
     return cql_op
 
 
+# Fields holding the item's temporal extent. CMIP6 items are ranges:
+# ``properties.datetime`` is null while ``start_datetime``/``end_datetime`` are set.
+_START_DATETIME_FIELD = "properties.start_datetime"
+_END_DATETIME_FIELD = "properties.end_datetime"
+
+
+def parse_datetime_interval(
+    datetime_search: t.Any,
+) -> tuple[str | None, str | None]:
+    """Parse a STAC ``datetime`` parameter into a ``(start, end)`` pair.
+
+    Accepts a single RFC 3339 instant (``"2020-01-01T00:00:00Z"``) or an
+    interval (``"start/end"``). Open-ended bounds — expressed as ``".."`` or an
+    empty component — become ``None``. A single instant is returned as
+    ``(value, value)``.
+    """
+    if datetime_search is None:
+        return None, None
+
+    text = datetime_search if isinstance(datetime_search, str) else str(datetime_search)
+    text = text.strip()
+
+    if "/" in text:
+        start_str, _, end_str = text.partition("/")
+    else:
+        start_str = end_str = text
+
+    def _norm(component: str) -> str | None:
+        component = component.strip()
+        if component in ("", ".."):
+            return None
+        return component
+
+    return _norm(start_str), _norm(end_str)
+
+
 @attrs.define
 class DatabaseLogic:
     item_serializer: type[serializers.ItemSerializer] = attrs.field(
@@ -376,6 +412,39 @@ class DatabaseLogic:
         search: globus_sdk.SearchQuery, shape: dict[str, t.Any]
     ):
         # search.add_filter(...)
+        return search
+
+    @staticmethod
+    def apply_datetime_filter(search: globus_sdk.SearchQuery, datetime_search: t.Any):
+        """Filter items whose temporal extent intersects the query interval.
+
+        Items store their extent as ``properties.start_datetime`` /
+        ``properties.end_datetime``. An item intersects the query interval
+        ``[start, end]`` when ``start_datetime <= end`` and
+        ``end_datetime >= start``. Each bound is applied only when present, so
+        open-ended and single-instant queries are handled naturally.
+        """
+        start, end = parse_datetime_interval(datetime_search)
+        if start is None and end is None:
+            return search
+
+        search["filters"] = search.get("filters", [])
+        if end is not None:
+            search["filters"].append(
+                {
+                    "type": "range",
+                    "field_name": _START_DATETIME_FIELD,
+                    "values": [{"from": "*", "to": end}],
+                }
+            )
+        if start is not None:
+            search["filters"].append(
+                {
+                    "type": "range",
+                    "field_name": _END_DATETIME_FIELD,
+                    "values": [{"from": start, "to": "*"}],
+                }
+            )
         return search
 
     @staticmethod

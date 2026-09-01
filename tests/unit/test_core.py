@@ -267,7 +267,6 @@ def test_post_search_applies_request_filters_and_pagination():
     database.total = 7
     database.next_marker = "next-page"
     client = _client(database)
-    client._return_date = lambda value: f"parsed:{value}"
     search_request = SimpleNamespace(
         ids=["item-1"],
         collections=["CMIP6"],
@@ -288,7 +287,7 @@ def test_post_search_applies_request_filters_and_pagination():
     assert ("apply_collections_filter", ["CMIP6"]) in database.calls
     assert (
         "apply_datetime_filter",
-        "parsed:2025-01-01/2025-12-31",
+        "2025-01-01/2025-12-31",
     ) in database.calls
     assert ("apply_bbox_filter", [-10, -20, 30, 40]) in database.calls
     assert (
