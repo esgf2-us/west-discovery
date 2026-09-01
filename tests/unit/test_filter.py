@@ -5,8 +5,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from stac_fastapi.core.extensions.filter import DEFAULT_QUERYABLES
 
-from stac_fastapi.globus_search.filter import (GlobusSearchFiltersClient,
-                                               _infer_json_schema_type)
+from stac_fastapi.globus_search.filter import (
+    GlobusSearchFiltersClient,
+    _infer_json_schema_type,
+)
 
 
 def _make_database(items=None):
