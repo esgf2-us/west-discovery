@@ -132,6 +132,17 @@ def test_cql_to_filter_translates_supported_filters(cql_query, expected):
     assert cql_to_filter(cql_query) == expected
 
 
+def test_cql_to_filter_maps_alternate_name_to_assets_field():
+    result = cql_to_filter(
+        {"op": "=", "args": [{"property": "alternate:name"}, "eagle.alcf.anl.gov"]}
+    )
+    assert result == {
+        "type": "match_any",
+        "field_name": "assets.alternate:name",
+        "values": ["eagle.alcf.anl.gov"],
+    }
+
+
 def test_cql_to_filter_translates_boolean_groups():
     cql_query = {
         "op": "and",

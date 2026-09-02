@@ -567,6 +567,13 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
         {"name": "total_count", "data_type": "integer"},
     ]
 
+    # Aggregations that map to a common (non-project-namespaced) index field
+    # rather than the "properties.{project}:{facet}" convention. Replica host
+    # names, for example, live at "assets.alternate:name" across all collections.
+    COMMON_AGGREGATIONS = {
+        "alternate_name_frequency": "assets.alternate:name",
+    }
+
     async def get_aggregations(
         self, collection_id: Optional[str] = None, **kwargs
     ) -> AggregationCollection:
@@ -687,6 +694,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                 ]
             )
 
+        facet_name_to_aggregation: dict[str, str] = {}
         for aggregation in aggregations:
             if aggregation == "total_count":
                 response = await run_in_threadpool(
@@ -703,27 +711,31 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     ],
                     "links": links,
                 }
-            else:
 
+            if aggregation in self.COMMON_AGGREGATIONS:
+                # Non-project-namespaced field (e.g. replica host names).
+                field_name = self.COMMON_AGGREGATIONS[aggregation]
+                facet_name = aggregation.removesuffix("_frequency")
+            else:
                 char, index = find_first_non_alphanumeric(aggregation)
-                if index != -1:
-                    project = aggregation[:index]
-                else:
+                if index == -1:
                     raise HTTPException(
                         status_code=400,
                         detail="Character separating project and field not found in aggregation string.",
                     )
-
-                facet = aggregation.removeprefix(f"{project}{char}").removesuffix(
+                project = aggregation[:index]
+                facet_name = aggregation.removeprefix(f"{project}{char}").removesuffix(
                     f"{char}frequency"
                 )
+                field_name = f"properties.{project}:{facet_name}"
 
-                search.add_facet(
-                    facet,
-                    field_name=f"properties.{project}:{facet}",
-                    type="terms",
-                    size=size,
-                )
+            search.add_facet(
+                facet_name,
+                field_name=field_name,
+                type="terms",
+                size=size,
+            )
+            facet_name_to_aggregation[facet_name] = aggregation
 
         response = await run_in_threadpool(
             self.client.post_search, settings.search_index_id, search
@@ -740,7 +752,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     }
                     stac_buckets.append(stac_bucket)
                 stac_aggregation = {
-                    "name": f"{project}{char}{facet['name']}{char}frequency",
+                    "name": facet_name_to_aggregation.get(facet["name"], facet["name"]),
                     "data_type": "frequency_distribution",
                     "buckets": stac_buckets,
                 }

@@ -356,6 +356,44 @@ def test_aggregate_adds_terms_facet_and_converts_buckets():
     }
 
 
+def test_aggregate_supports_common_alternate_name_frequency():
+    client = _client(
+        search_response={
+            "total": 3,
+            "facet_results": [
+                {
+                    "name": "alternate_name",
+                    "buckets": [
+                        {"value": "eagle.alcf.anl.gov", "count": 3},
+                    ],
+                }
+            ],
+        }
+    )
+
+    result = asyncio.run(
+        client.aggregate(
+            aggregations=["alternate_name_frequency"],
+            collection_id="CMIP6Test",
+            size=5,
+            request=_request(),
+        )
+    )
+
+    index_id, search = client.client.calls[0]
+    assert index_id == "test-search-index"
+    assert search["facets"] == [
+        {
+            "name": "alternate_name",
+            "field_name": "assets.alternate:name",
+            "type": "terms",
+            "size": 5,
+        }
+    ]
+    assert result["aggregations"][0]["name"] == "alternate_name_frequency"
+    assert result["aggregations"][0]["buckets"][0]["key"] == "eagle.alcf.anl.gov"
+
+
 def test_aggregate_returns_empty_aggregations_without_facet_results():
     client = _client(search_response={"total": 0, "facet_results": []})
 

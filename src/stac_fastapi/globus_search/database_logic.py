@@ -47,11 +47,21 @@ def _collection_property_prefix(collection_ids: list[str] | None) -> str | None:
     return collection_ids[0].lower()
 
 
+# CQL2 properties whose index field does not live under "properties.". For
+# example, replica host names are stored at "assets.alternate:name", not
+# "properties.alternate:name".
+_CQL_FIELD_OVERRIDES = {
+    "alternate:name": "assets.alternate:name",
+}
+
+
 def cql_translate_fieldname(
     fieldname: str, collection_ids: list[str] | None = None
 ) -> str:
     if fieldname in ("id", "collection", "geometry"):
         return fieldname
+    if fieldname in _CQL_FIELD_OVERRIDES:
+        return _CQL_FIELD_OVERRIDES[fieldname]
     # Already-qualified names pass through unchanged (idempotent).
     if fieldname.startswith("properties."):
         return fieldname
