@@ -1,160 +1,80 @@
-> [!CAUTION] Experimental
+# west-discovery
 
-# west-discovery (STAC FastAPI)
-
-A STAC API facade that uses Globus Search as the backend. This project adapts
-`stac-fastapi` to query a Globus Search index and expose STAC Collections and
-Items over HTTP, with optional aggregation and CQL2 JSON filtering.
-
-## What This Provides
-
-- A FastAPI-based STAC API server backed by Globus Search.
-- STAC search with pagination tokens and optional CQL2 JSON filtering.
-- Aggregation extension support (Globus Search aggregation client).
-- Local collection schemas for `CMIP6` and `obs4MIPs`.
-- Scripts to scrape STAC items from CEDA and ingest them into Globus Search.
-- Docker and GitHub Actions workflow for build + ECS deployment.
+A STAC API backed by Globus Search. Exposes ESGF climate datasets as STAC Collections and Items over HTTP, with CQL2 JSON filtering, aggregation, free-text search, and queryables derived from ESGF controlled vocabularies.
 
 ## Repository Layout
 
-- `src/stac_fastapi/globus_search/`: Globus Search backend implementation.
-- `src/stac_fastapi/globus_search/schemas/`: Local STAC collection definitions.
-- `scripts/`: Scrape, ingest, and local query helpers (using `pip-run`).
-- `ecs/`: ECS task definition used by CI/CD.
-- `Dockerfile`: Container build for the API.
+| Path | Purpose |
+|---|---|
+| `src/stac_fastapi/globus_search/` | Core backend implementation |
+| `Dockerfile` | Multi-stage container build |
 
-## Requirements
-
-- Python 3.12
-- Globus Search access (read for API, write for ingest)
-
-You can install dependencies via Poetry (`pyproject.toml`) or `requirements.txt`.
-Note: the Poetry and `requirements.txt` dependency sets are not identical. Use
-one approach consistently.
-
-## Quickstart (Local API)
-
-### 1) Install dependencies
-
-With Poetry:
+## Local Development
 
 ```bash
-poetry install
+# Build the development image (no SSL, hot reload)
+docker build --target development -t discovery-api:dev .
+
+# Run with source mounted for hot reload
+docker run -p 8000:8000 -v ./src/stac_fastapi:/var/task/stac_fastapi discovery-api:dev
 ```
 
-With pip:
+The API is available at `http://localhost:8000`.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-### 2) Run the API
-
-With Uvicorn directly:
-
-```bash
-uvicorn stac_fastapi.globus_search.app:handler --host 0.0.0.0 --port 8000 --reload
-```
-
-The API will serve STAC endpoints at `http://localhost:8000/`.
-
-### 3) Cache directory
-
-The API uses `hishel` with an on-disk SQLite cache at `cache/hishel_cache.db`.
-Create the directory before first run if it doesn't exist:
-
-```bash
-mkdir -p cache
-```
-
-## Tests
-
-Install development dependencies, then run pytest:
-
-With Poetry:
-
-```bash
-poetry install --with dev
-poetry run pytest
-```
-
-With pip:
+## Running Without Docker
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
-python -m pytest
+esgvoc use cmip6@latest \
+    && esgvoc use cmip6plus@latest \
+    && esgvoc use cordex-cmip6@latest \
+    && esgvoc use cmip7@latest \
+    && esgvoc use obs4ref@latest \
+    && esgvoc use universe@latest
+uvicorn stac_fastapi.globus_search.app:handler --host 0.0.0.0 --port 8000 --reload
 ```
 
-To generate coverage reports:
+## Tests
 
 ```bash
-python -m coverage run -m pytest
-python -m coverage report
-python -m coverage xml -o reports/coverage.xml
+pip install -r requirements-dev.txt
+pytest
+# With coverage
+coverage run -m pytest && coverage report
 ```
 
 ## Configuration
 
-- **Search index**: set in `src/stac_fastapi/globus_search/config.py` as
-  `SEARCH_INDEX_ID`. Update this to match the Globus Search index you intend
-  to query.
-- **Globus Search client**: created via `GlobusSearchSettings().create_client`.
-  This relies on `globus-sdk` defaults and the `stac-fastapi` settings model.
+`SEARCH_INDEX_ID` in `src/stac_fastapi/globus_search/config.py` controls which Globus Search index is queried. Authentication uses `globus-sdk` defaults.
 
-If you need environment-driven configuration, add fields to
-`GlobusSearchSettings` or refer to the upstream `stac-fastapi` `ApiSettings`
-options.
+## Collections
 
-## CQL2 JSON Filter Support
+Collections are derived from ESGF controlled vocabularies via [esgvoc](https://github.com/ESGF/esgvoc). The following projects are supported:
 
-CQL2 JSON filters are translated into Globus Search filters. Supported operators
-include:
+| Collection | Notes |
+|---|---|
+| CMIP6 | |
+| CMIP6Plus | |
+| CMIP7 | |
+| CORDEX-CMIP6 | |
+| obs4REF | |
+| CMIP6Test | Integration environment only |
 
-- Boolean: `and`, `or`, `not`
-- Comparison: `=`, `<>`, `<=`, `>=`, `in`, `isNull`
-- Spatial: `s_intersects`, `s_within` (maps to geo_shape)
+## Extensions
 
-Unsupported operators raise `NotImplementedError` or `ValueError` (see
-`cql_to_filter` in `src/stac_fastapi/globus_search/database_logic.py`).
+| Extension | Notes |
+|---|---|
+| Filter (CQL2 JSON) | `and`, `or`, `not`, `=`, `<>`, `<=`, `>=`, `in`, `isNull`, `like`, `s_intersects`, `s_within` |
+| Aggregation | Backed by Globus Search aggregations |
+| Free-text | OR-joined query string |
+| Token pagination | Globus Search scroll marker |
+| Queryables | Derived from esgvoc controlled vocabularies; falls back to item sampling for unknown collections |
 
-## Docker
+## CI/CD
 
-Build and run locally:
-
-```bash
-docker build -t west-discovery-api .
-docker run --rm -p 8000:8000 west-discovery-api
-```
-
-The container runs Uvicorn with the ASGI cache middleware handler.
-
-## CI/CD and Deployment
-
-The GitHub Actions workflow (`.github/workflows/build-and-deploy.yml`):
-
-- Builds and pushes a Docker image to ECR on pushes to `add-ci-cd`,
-  `integration`, or `main`.
-- Deploys to ECS integration on pushes to `add-ci-cd` or `integration`.
-- Deploys to ECS production on merges to `main`.
-
-ECS task definitions live in `ecs/task-definition.json`.
-
-## Known Gaps
-
-- No automated tests in `tests/` yet.
-- Some CQL2 operators are intentionally unsupported.
-- Search index ID is currently a code constant (not environment-driven).
-
-## Contributing
-
-- Keep changes aligned with `stac-fastapi` API expectations.
-- Add tests when introducing new filter translations or request behaviors.
-- Prefer updating `GlobusSearchSettings` for configuration rather than
-  scattering environment reads.
+Deployment is managed via Github Actions in a separate private repository. The production Docker target is used for all CI builds.
 
 ## License
 
