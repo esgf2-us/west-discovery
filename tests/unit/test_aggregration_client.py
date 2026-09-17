@@ -7,7 +7,6 @@ from starlette.requests import Request
 
 from stac_fastapi.globus_search.extensions.aggregration.client import (
     GlobusSearchAggregationClient,
-    find_first_non_alphanumeric,
 )
 
 
@@ -63,18 +62,6 @@ def _client(database=None, search_response=None):
     return client
 
 
-@pytest.mark.parametrize(
-    ("aggregation", "expected"),
-    [
-        ("cmip6_activity_id_frequency", ("_", 5)),
-        ("cordex-cmip6_activity_id_frequency", ("-", 6)),
-        ("totalcount", (None, -1)),
-    ],
-)
-def test_find_first_non_alphanumeric(aggregation, expected):
-    assert find_first_non_alphanumeric(aggregation) == expected
-
-
 def test_get_aggregations_returns_global_default_aggregation():
     result = asyncio.run(_client().get_aggregations(request=_request()))
 
@@ -105,9 +92,13 @@ def test_get_aggregations_returns_collection_defaults_and_links():
 
     assert result["type"] == "AggregationCollection"
     assert result["aggregations"] == (
-        client.CMIP6_DEFAULT_AGGREGATIONS
+        client.DEFAULT_FREQUENCY_AGGREGATIONS
         + [{"name": "total_count", "data_type": "integer"}]
     )
+    # Advertised names are bare (no project/collection prefix).
+    assert "activity_id_frequency" in {
+        a["name"] for a in client.DEFAULT_FREQUENCY_AGGREGATIONS
+    }
     assert result["links"] == [
         {
             "rel": "root",
@@ -155,19 +146,17 @@ def test_aggregate_rejects_missing_aggregations(aggregations):
     )
 
 
-def test_aggregate_rejects_malformed_frequency_aggregation_name():
+def test_aggregate_rejects_namespaced_aggregation_without_single_collection():
     with pytest.raises(HTTPException) as exc_info:
         asyncio.run(
             _client().aggregate(
-                aggregations=["cmip6activityidfrequency"],
+                aggregations=["activity_id_frequency"],
                 request=_request(),
             )
         )
 
     assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == (
-        "Character separating project and field not found in aggregation string."
-    )
+    assert "requires exactly one collection" in exc_info.value.detail
 
 
 def test_aggregate_total_count_returns_search_total():
@@ -218,12 +207,15 @@ def test_aggregate_request_can_drive_filter_collection_and_size():
         )
     )
 
+    # The collection filter must be applied before the CQL2 filter so the CQL2
+    # translation can resolve per-collection field namespaces (see the
+    # collection-scoped regression test below).
     assert database.calls == [
+        ("apply_collections_filter", ["CMIP6"]),
         (
             "apply_cql2_filter",
             {"op": "=", "args": [{"property": "collection"}, "CMIP6"]},
         ),
-        ("apply_collections_filter", ["CMIP6"]),
     ]
     index_id, search = client.client.calls[0]
     assert index_id == "test-search-index"
@@ -399,12 +391,99 @@ def test_aggregate_returns_empty_aggregations_without_facet_results():
 
     result = asyncio.run(
         client.aggregate(
-            aggregations=["cmip6_activity_id_frequency"],
+            aggregations=["activity_id_frequency"],
+            collection_id="CMIP6",
             request=_request(),
         )
     )
 
     assert result["aggregations"] == []
+
+
+@pytest.mark.parametrize(
+    "aggregation",
+    [
+        "activity_id_frequency",  # canonical bare name
+        "cordex-cmip6_activity_id_frequency",  # legacy hyphen-prefixed name
+        "cordex_cmip6_activity_id_frequency",  # legacy underscore-prefixed name
+    ],
+)
+def test_aggregate_cordex_cmip6_resolves_collection_namespaced_field(aggregation):
+    client = _client(
+        search_response={
+            "total": 1,
+            "facet_results": [
+                {
+                    "name": "activity_id",
+                    "buckets": [{"value": "DD", "count": 1}],
+                }
+            ],
+        }
+    )
+
+    result = asyncio.run(
+        client.aggregate(
+            aggregations=[aggregation],
+            collections=["CORDEX-CMIP6"],
+            size=5,
+            request=_request(),
+        )
+    )
+
+    _, search = client.client.calls[0]
+    assert search["facets"] == [
+        {
+            "name": "activity_id",
+            "field_name": "properties.cordex-cmip6:activity_id",
+            "type": "terms",
+            "size": 5,
+        }
+    ]
+    # Response echoes the name the client requested.
+    assert result["aggregations"][0]["name"] == aggregation
+    assert result["aggregations"][0]["buckets"][0]["key"] == "DD"
+
+
+def test_aggregate_collection_scoped_filter_resolves_bare_property_via_url():
+    """Regression: a bare-property CQL2 filter on the collection-scoped
+    /aggregate path must resolve its field namespace from the collection in the
+    URL. This requires apply_collections_filter to run before apply_cql2_filter;
+    otherwise the CQL2 translation sees zero collections and raises
+    "require exactly one collection". Uses the real DatabaseLogic so the
+    namespace resolution is exercised end to end.
+    """
+    from stac_fastapi.globus_search.database_logic import DatabaseLogic
+
+    client = _client(DatabaseLogic(), search_response={"total": 7, "facet_results": []})
+    aggregate_request = SimpleNamespace(
+        filter_expr={"op": "=", "args": [{"property": "frequency"}, "mon"]},
+        aggregations=["total_count"],
+        collections=None,
+        size=10,
+    )
+
+    result = asyncio.run(
+        client.aggregate(
+            aggregate_request=aggregate_request,
+            request=_request(path="/collections/CORDEX-CMIP6/aggregate"),
+        )
+    )
+
+    _, search = client.client.calls[0]
+    filters = search["filters"]
+    # Collection filter is present...
+    assert {
+        "type": "match_any",
+        "field_name": "collection",
+        "values": ["CORDEX-CMIP6"],
+    } in filters
+    # ...and the bare property resolved to the per-collection namespace.
+    assert {
+        "type": "match_any",
+        "field_name": "properties.cordex-cmip6:frequency",
+        "values": ["mon"],
+    } in filters
+    assert result["aggregations"][0]["value"] == 7
 
 
 def test_aggregate_wraps_cql2_filter_errors_in_http_400():
