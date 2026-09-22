@@ -42,6 +42,14 @@ def cql_like_to_globus_like(pattern: str) -> str:
 
 
 def _collection_property_prefix(collection_ids: list[str] | None) -> str | None:
+    """Return the single collection's lowercased id, or None if not exactly one.
+
+    Used by the aggregation extension to namespace bare facet names to their
+    per-collection index field ("properties.<collection>:<facet>"). The CQL2
+    filter path no longer needs this — it qualifies field names transparently
+    (see ``cql_translate_fieldname``) — but the aggregation client still relies
+    on it, so it must remain importable.
+    """
     if not collection_ids or len(collection_ids) != 1:
         return None
     return collection_ids[0].lower()
@@ -55,9 +63,7 @@ _CQL_FIELD_OVERRIDES = {
 }
 
 
-def cql_translate_fieldname(
-    fieldname: str, collection_ids: list[str] | None = None
-) -> str:
+def cql_translate_fieldname(fieldname: str) -> str:
     if fieldname in ("id", "collection", "geometry"):
         return fieldname
     if fieldname in _CQL_FIELD_OVERRIDES:
@@ -65,40 +71,14 @@ def cql_translate_fieldname(
     # Already-qualified names pass through unchanged (idempotent).
     if fieldname.startswith("properties."):
         return fieldname
-    if ":" in fieldname:
-        return f"properties.{fieldname}"
-    collection_prefix = _collection_property_prefix(collection_ids)
-    if collection_prefix is None:
-        # A bare property (e.g. "experiment_id") is stored in the index under a
-        # per-collection namespace ("properties.<collection>:experiment_id"). We
-        # can only resolve that namespace when the request scopes to exactly one
-        # collection. Zero or multiple collections would silently produce an
-        # un-namespaced field that matches nothing, so fail loudly instead.
-        count = len(collection_ids) if collection_ids else 0
-        raise ValueError(
-            f"cannot resolve property '{fieldname}': CQL2 property filters "
-            f"require exactly one collection to determine the field namespace "
-            f"(got {count}). Specify a single collection in the request."
-        )
-    return f"properties.{collection_prefix}:{fieldname}"
+    # Every other name is a bare field under the item's "properties" key, so
+    # qualifying it makes "fieldname" and "properties.fieldname" equivalent.
+    # Keys are stored verbatim (e.g. "cmip6:activity_id"), so any collection
+    # prefix is already part of the name the user supplies.
+    return f"properties.{fieldname}"
 
 
-def _extract_collection_ids(search: globus_sdk.SearchQuery) -> list[str] | None:
-    collection_ids = []
-
-    for filter_ in search.get("filters", ()):
-        if (
-            filter_.get("type") == "match_any"
-            and filter_.get("field_name") == "collection"
-        ):
-            collection_ids.extend(filter_.get("values", ()))
-
-    return collection_ids or None
-
-
-def cql_to_filter(
-    cql_query: dict[str, t.Any], collection_ids: list[str] | None = None
-) -> dict[str, t.Any]:
+def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
     """
     Convert a CQL2 filter to a Globus Search filter.
 
@@ -124,7 +104,7 @@ def cql_to_filter(
         # BASIC CQL2 (partial)
         case "not":
             # convert the inner filter to a Search filter
-            inner = cql_to_filter(cql_query["args"][0], collection_ids=collection_ids)
+            inner = cql_to_filter(cql_query["args"][0])
             # not(not(x)) == x
             if inner["type"] == "not":
                 return inner["filter"]
@@ -135,10 +115,7 @@ def cql_to_filter(
             # 'and' and 'or' ('op' --> 'type' and 'args' --> 'filter')
             return {
                 "type": cql_op,
-                "filters": [
-                    cql_to_filter(inner, collection_ids=collection_ids)
-                    for inner in cql_query["args"]
-                ],
+                "filters": [cql_to_filter(inner) for inner in cql_query["args"]],
             }
         case "=":
             # The CQL2 standards
@@ -162,9 +139,7 @@ def cql_to_filter(
 
             return {
                 "type": "match_any",
-                "field_name": cql_translate_fieldname(
-                    cql_query["args"][0]["property"], collection_ids=collection_ids
-                ),
+                "field_name": cql_translate_fieldname(cql_query["args"][0]["property"]),
                 "values": [cql_query["args"][1]],
             }
         case "<>":
@@ -180,7 +155,6 @@ def cql_to_filter(
                     "type": "match_any",
                     "field_name": cql_translate_fieldname(
                         cql_query["args"][0]["property"],
-                        collection_ids=collection_ids,
                     ),
                     "values": [cql_query["args"][1]],
                 },
@@ -197,7 +171,6 @@ def cql_to_filter(
                     "type": "exists",
                     "field_name": cql_translate_fieldname(
                         cql_query["args"][0]["property"],
-                        collection_ids=collection_ids,
                     ),
                 },
             }
@@ -206,9 +179,7 @@ def cql_to_filter(
             value = cql_query["args"][1]
             return {
                 "type": "range",
-                "field_name": cql_translate_fieldname(
-                    cql_query["args"][0]["property"], collection_ids=collection_ids
-                ),
+                "field_name": cql_translate_fieldname(cql_query["args"][0]["property"]),
                 "values": [{"from": "*", "to": value}],
             }
         case ">=":
@@ -216,9 +187,7 @@ def cql_to_filter(
             value = cql_query["args"][1]
             return {
                 "type": "range",
-                "field_name": cql_translate_fieldname(
-                    cql_query["args"][0]["property"], collection_ids=collection_ids
-                ),
+                "field_name": cql_translate_fieldname(cql_query["args"][0]["property"]),
                 "values": [{"from": value, "to": "*"}],
             }
         # ADVANCED COMPARISON OPERATORS (???)
@@ -235,9 +204,7 @@ def cql_to_filter(
 
             return {
                 "type": "like",
-                "field_name": cql_translate_fieldname(
-                    cql_query["args"][0]["property"], collection_ids=collection_ids
-                ),
+                "field_name": cql_translate_fieldname(cql_query["args"][0]["property"]),
                 "value": cql_like_to_globus_like(value),
             }
         case "between":
@@ -247,9 +214,7 @@ def cql_to_filter(
 
             return {
                 "type": "match_any",
-                "field_name": cql_translate_fieldname(
-                    cql_query["args"][0]["property"], collection_ids=collection_ids
-                ),
+                "field_name": cql_translate_fieldname(cql_query["args"][0]["property"]),
                 "values": cql_query["args"][1],
             }
         # SPATIAL OPERATORS (partial)
@@ -259,9 +224,7 @@ def cql_to_filter(
 
             return {
                 "type": "geo_shape",
-                "field_name": cql_translate_fieldname(
-                    cql_query["args"][0]["property"], collection_ids=collection_ids
-                ),
+                "field_name": cql_translate_fieldname(cql_query["args"][0]["property"]),
                 "relation": cql_op[2:],
                 "shape": cql_query["args"][1],
             }
@@ -477,9 +440,7 @@ class DatabaseLogic:
     ):
         if filter_:
             search["filters"] = search.get("filters", [])
-            search["filters"].append(
-                cql_to_filter(filter_, collection_ids=_extract_collection_ids(search))
-            )
+            search["filters"].append(cql_to_filter(filter_))
         return search
 
     @staticmethod

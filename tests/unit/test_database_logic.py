@@ -560,7 +560,38 @@ def test_cql_to_filter_raises_value_error_for_like_with_non_string_pattern():
         cql_to_filter({"op": "like", "args": [{"property": "activity_id"}, 42]})
 
 
-def test_apply_cql2_filter_detects_collection_prefix_past_non_matching_filters():
+@pytest.mark.parametrize(
+    ("field", "expected"),
+    [
+        # A bare name and its "properties."-qualified form are equivalent.
+        ("retracted", "properties.retracted"),
+        ("properties.retracted", "properties.retracted"),
+        ("datetime", "properties.datetime"),
+        # Facet keys carry their prefix verbatim; it is not injected.
+        ("cmip6:activity_id", "properties.cmip6:activity_id"),
+        ("properties.cmip6:activity_id", "properties.cmip6:activity_id"),
+    ],
+)
+def test_cql_to_filter_qualifies_property_transparently(field, expected):
+    result = cql_to_filter({"op": "=", "args": [{"property": field}, "x"]})
+    assert result == {
+        "type": "match_any",
+        "field_name": expected,
+        "values": ["x"],
+    }
+
+
+def test_cql_to_filter_qualifies_without_a_collection_scope():
+    # Qualification is a pure prefix, so no collection scope is required.
+    result = cql_to_filter({"op": "=", "args": [{"property": "retracted"}, False]})
+    assert result == {
+        "type": "match_any",
+        "field_name": "properties.retracted",
+        "values": [False],
+    }
+
+
+def test_apply_cql2_filter_qualifies_bare_property_among_other_filters():
     search = globus_sdk.SearchQuery()
     search["filters"] = [
         {"type": "exists", "field_name": "id"},
@@ -568,7 +599,7 @@ def test_apply_cql2_filter_detects_collection_prefix_past_non_matching_filters()
     ]
 
     DatabaseLogic.apply_cql2_filter(
-        search, {"op": "like", "args": [{"property": "experiment_id"}, "hist%"]}
+        search, {"op": "like", "args": [{"property": "cmip6:experiment_id"}, "hist%"]}
     )
 
     assert search["filters"][-1] == {
@@ -576,31 +607,6 @@ def test_apply_cql2_filter_detects_collection_prefix_past_non_matching_filters()
         "field_name": "properties.cmip6:experiment_id",
         "value": "hist*",
     }
-
-
-def test_cql_to_filter_raises_when_bare_property_has_no_collection():
-    with pytest.raises(ValueError, match="exactly one collection"):
-        cql_to_filter({"op": "=", "args": [{"property": "activity_id"}, "CMIP"]})
-
-
-def test_cql_to_filter_raises_when_bare_property_has_multiple_collections():
-    with pytest.raises(ValueError, match="exactly one collection"):
-        cql_to_filter(
-            {"op": "like", "args": [{"property": "experiment_id"}, "hist%"]},
-            collection_ids=["CMIP6", "CMIP7"],
-        )
-
-
-def test_apply_cql2_filter_rejects_property_filter_without_single_collection():
-    search = globus_sdk.SearchQuery()
-    search["filters"] = [
-        {"type": "match_any", "field_name": "collection", "values": ["CMIP6", "CMIP7"]}
-    ]
-
-    with pytest.raises(ValueError, match="exactly one collection"):
-        DatabaseLogic.apply_cql2_filter(
-            search, {"op": "=", "args": [{"property": "activity_id"}, "CMIP"]}
-        )
 
 
 def test_execute_search_propagates_search_api_error(monkeypatch):
