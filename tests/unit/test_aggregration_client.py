@@ -444,21 +444,27 @@ def test_aggregate_cordex_cmip6_resolves_collection_namespaced_field(aggregation
     assert result["aggregations"][0]["buckets"][0]["key"] == "DD"
 
 
-def test_aggregate_collection_scoped_filter_is_applied_with_collection():
-    """A CQL2 filter on the collection-scoped /aggregate path is applied to the
-    search alongside the collection filter. Field names resolve transparently:
-    the "cordex-cmip6:" prefix is part of the property key the caller supplies,
-    not injected from the URL (see database_logic.cql_translate_fieldname).
-    Uses the real DatabaseLogic so the translation is exercised end to end.
+def test_aggregate_collection_scoped_filter_resolves_bare_property_via_url(monkeypatch):
+    """Regression: a bare-property CQL2 filter on the collection-scoped
+    /aggregate path resolves its facet namespace from the collection in the URL.
+    This requires apply_collections_filter to run before apply_cql2_filter so the
+    CQL2 translation can read the single collection off the search object;
+    otherwise it sees zero collections and raises "require exactly one
+    collection". Uses the real DatabaseLogic (facet lookup stubbed) so the
+    ordering and namespace resolution are exercised end to end.
     """
+    from stac_fastapi.globus_search import database_logic
     from stac_fastapi.globus_search.database_logic import DatabaseLogic
+
+    monkeypatch.setattr(
+        database_logic,
+        "collection_property_keys",
+        lambda project_id: frozenset({"cordex-cmip6:frequency"}),
+    )
 
     client = _client(DatabaseLogic(), search_response={"total": 7, "facet_results": []})
     aggregate_request = SimpleNamespace(
-        filter_expr={
-            "op": "=",
-            "args": [{"property": "cordex-cmip6:frequency"}, "mon"],
-        },
+        filter_expr={"op": "=", "args": [{"property": "frequency"}, "mon"]},
         aggregations=["total_count"],
         collections=None,
         size=10,
@@ -479,7 +485,7 @@ def test_aggregate_collection_scoped_filter_is_applied_with_collection():
         "field_name": "collection",
         "values": ["CORDEX-CMIP6"],
     } in filters
-    # ...and the property resolved by transparent "properties." prefixing.
+    # ...and the bare facet resolved to the per-collection namespace.
     assert {
         "type": "match_any",
         "field_name": "properties.cordex-cmip6:frequency",

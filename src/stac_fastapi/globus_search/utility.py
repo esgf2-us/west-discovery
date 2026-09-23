@@ -6,8 +6,35 @@ from functools import lru_cache
 import esgvoc.api.projects as ev
 from esgvoc.api.project_specs import DrsType
 from esgvoc.apps.jsg.json_schema_generator import generate_json_schema
+from stac_fastapi.core.extensions.filter import DEFAULT_QUERYABLES
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=None)
+def collection_property_keys(project_id: str) -> frozenset[str]:
+    """Return the item property keys for a project, exactly as esgvoc names them.
+
+    These are the keys as stored under the item's ``properties`` object: CV/DRS
+    facets are project-prefixed (e.g. ``cmip6:activity_id``) while common fields
+    are bare (e.g. ``retracted``, ``latest``). The CQL2 filter path uses this set
+    to resolve a user-supplied bare name to the real index field — matching it
+    directly (common field) or under the ``<collection>:`` prefix (facet).
+    Common STAC fields (``DEFAULT_QUERYABLES``) are excluded. Returns an empty
+    set for unknown projects or if the esgvoc lookup fails.
+    """
+    pid = project_id.lower()
+    try:
+        if ev.get_project(pid) is None:
+            return frozenset()
+        schema = generate_json_schema(pid)
+        item_properties = (
+            schema.get("definitions", {}).get("item_fields", {}).get("properties", {})
+        )
+        return frozenset(k for k in item_properties if k not in DEFAULT_QUERYABLES)
+    except Exception:
+        logger.warning("Failed to load esgvoc properties for project '%s'", project_id)
+        return frozenset()
 
 
 def _extract_summaries_from_schema(schema: dict) -> dict:

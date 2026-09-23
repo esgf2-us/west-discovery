@@ -13,7 +13,7 @@ from starlette.requests import Request
 
 from .config import settings
 from .convert import search_doc_to_stac_item
-from .utility import get_project, list_projects
+from .utility import collection_property_keys, get_project, list_projects
 
 _client = settings.search_client
 
@@ -44,11 +44,11 @@ def cql_like_to_globus_like(pattern: str) -> str:
 def _collection_property_prefix(collection_ids: list[str] | None) -> str | None:
     """Return the single collection's lowercased id, or None if not exactly one.
 
-    Used by the aggregation extension to namespace bare facet names to their
-    per-collection index field ("properties.<collection>:<facet>"). The CQL2
-    filter path no longer needs this — it qualifies field names transparently
-    (see ``cql_translate_fieldname``) — but the aggregation client still relies
-    on it, so it must remain importable.
+    Used to namespace bare facet names to their per-collection index field
+    ("properties.<collection>:<facet>") on both the CQL2 filter path
+    (``cql_translate_fieldname``) and the aggregation extension. A bare property
+    can only be resolved against exactly one collection, so zero or multiple
+    collections return None (callers raise a helpful error).
     """
     if not collection_ids or len(collection_ids) != 1:
         return None
@@ -63,7 +63,29 @@ _CQL_FIELD_OVERRIDES = {
 }
 
 
-def cql_translate_fieldname(fieldname: str) -> str:
+def cql_translate_fieldname(
+    fieldname: str, collection_ids: list[str] | None = None
+) -> str:
+    """Resolve a CQL2 property name to its Globus Search index field.
+
+    Both the bare and qualified forms of a property are accepted:
+
+    - ``id`` / ``collection`` / ``geometry`` and ``_CQL_FIELD_OVERRIDES`` map to
+      their fixed index fields.
+    - A name already starting with ``properties.`` passes through unchanged, and
+      an explicitly project-prefixed name (e.g. ``cmip6:activity_id``) is simply
+      qualified to ``properties.cmip6:activity_id``.
+    - A **bare** name is resolved against the single scoped collection's real
+      property keys (from esgvoc): if it exists bare it is a common field and
+      becomes ``properties.<name>`` (e.g. ``retracted``); otherwise, if the
+      ``<collection>:<name>`` key exists it is a facet and becomes
+      ``properties.<collection>:<name>`` (so ``activity_id`` ==
+      ``cmip6:activity_id``). An unknown bare name falls back to
+      ``properties.<name>``.
+
+    A bare name cannot be resolved without exactly one collection to determine
+    its namespace, so zero or multiple collections raise ``ValueError``.
+    """
     if fieldname in ("id", "collection", "geometry"):
         return fieldname
     if fieldname in _CQL_FIELD_OVERRIDES:
@@ -71,14 +93,46 @@ def cql_translate_fieldname(fieldname: str) -> str:
     # Already-qualified names pass through unchanged (idempotent).
     if fieldname.startswith("properties."):
         return fieldname
-    # Every other name is a bare field under the item's "properties" key, so
-    # qualifying it makes "fieldname" and "properties.fieldname" equivalent.
-    # Keys are stored verbatim (e.g. "cmip6:activity_id"), so any collection
-    # prefix is already part of the name the user supplies.
+    # Explicitly project-prefixed facet, e.g. "cmip6:activity_id".
+    if ":" in fieldname:
+        return f"properties.{fieldname}"
+    # Bare name: needs exactly one collection to resolve its namespace.
+    collection_prefix = _collection_property_prefix(collection_ids)
+    if collection_prefix is None:
+        count = len(collection_ids) if collection_ids else 0
+        raise ValueError(
+            f"cannot resolve bare property '{fieldname}': it requires exactly one "
+            f"collection to determine its namespace "
+            f"(got {count}). Specify a single collection, or use a qualified form "
+            f"such as 'properties.{fieldname}' or '<collection>:{fieldname}'."
+        )
+    # esgvoc names facets project-prefixed (cmip6:activity_id) and common fields
+    # bare (retracted). Match the bare form first (common field), then the
+    # collection-prefixed form (facet); fall back to un-prefixed for unknowns.
+    keys = collection_property_keys(collection_prefix)
+    if fieldname in keys:
+        return f"properties.{fieldname}"
+    if f"{collection_prefix}:{fieldname}" in keys:
+        return f"properties.{collection_prefix}:{fieldname}"
     return f"properties.{fieldname}"
 
 
-def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
+def _extract_collection_ids(search: globus_sdk.SearchQuery) -> list[str] | None:
+    collection_ids = []
+
+    for filter_ in search.get("filters", ()):
+        if (
+            filter_.get("type") == "match_any"
+            and filter_.get("field_name") == "collection"
+        ):
+            collection_ids.extend(filter_.get("values", ()))
+
+    return collection_ids or None
+
+
+def cql_to_filter(
+    cql_query: dict[str, t.Any], collection_ids: list[str] | None = None
+) -> dict[str, t.Any]:
     """
     Convert a CQL2 filter to a Globus Search filter.
 
@@ -104,7 +158,7 @@ def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
         # BASIC CQL2 (partial)
         case "not":
             # convert the inner filter to a Search filter
-            inner = cql_to_filter(cql_query["args"][0])
+            inner = cql_to_filter(cql_query["args"][0], collection_ids=collection_ids)
             # not(not(x)) == x
             if inner["type"] == "not":
                 return inner["filter"]
@@ -115,7 +169,10 @@ def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
             # 'and' and 'or' ('op' --> 'type' and 'args' --> 'filter')
             return {
                 "type": cql_op,
-                "filters": [cql_to_filter(inner) for inner in cql_query["args"]],
+                "filters": [
+                    cql_to_filter(inner, collection_ids=collection_ids)
+                    for inner in cql_query["args"]
+                ],
             }
         case "=":
             # The CQL2 standards
@@ -139,7 +196,9 @@ def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
 
             return {
                 "type": "match_any",
-                "field_name": cql_translate_fieldname(cql_query["args"][0]["property"]),
+                "field_name": cql_translate_fieldname(
+                    cql_query["args"][0]["property"], collection_ids=collection_ids
+                ),
                 "values": [cql_query["args"][1]],
             }
         case "<>":
@@ -154,7 +213,7 @@ def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
                 "filter": {
                     "type": "match_any",
                     "field_name": cql_translate_fieldname(
-                        cql_query["args"][0]["property"],
+                        cql_query["args"][0]["property"], collection_ids=collection_ids
                     ),
                     "values": [cql_query["args"][1]],
                 },
@@ -170,7 +229,7 @@ def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
                 "filter": {
                     "type": "exists",
                     "field_name": cql_translate_fieldname(
-                        cql_query["args"][0]["property"],
+                        cql_query["args"][0]["property"], collection_ids=collection_ids
                     ),
                 },
             }
@@ -179,7 +238,9 @@ def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
             value = cql_query["args"][1]
             return {
                 "type": "range",
-                "field_name": cql_translate_fieldname(cql_query["args"][0]["property"]),
+                "field_name": cql_translate_fieldname(
+                    cql_query["args"][0]["property"], collection_ids=collection_ids
+                ),
                 "values": [{"from": "*", "to": value}],
             }
         case ">=":
@@ -187,7 +248,9 @@ def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
             value = cql_query["args"][1]
             return {
                 "type": "range",
-                "field_name": cql_translate_fieldname(cql_query["args"][0]["property"]),
+                "field_name": cql_translate_fieldname(
+                    cql_query["args"][0]["property"], collection_ids=collection_ids
+                ),
                 "values": [{"from": value, "to": "*"}],
             }
         # ADVANCED COMPARISON OPERATORS (???)
@@ -204,7 +267,9 @@ def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
 
             return {
                 "type": "like",
-                "field_name": cql_translate_fieldname(cql_query["args"][0]["property"]),
+                "field_name": cql_translate_fieldname(
+                    cql_query["args"][0]["property"], collection_ids=collection_ids
+                ),
                 "value": cql_like_to_globus_like(value),
             }
         case "between":
@@ -214,7 +279,9 @@ def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
 
             return {
                 "type": "match_any",
-                "field_name": cql_translate_fieldname(cql_query["args"][0]["property"]),
+                "field_name": cql_translate_fieldname(
+                    cql_query["args"][0]["property"], collection_ids=collection_ids
+                ),
                 "values": cql_query["args"][1],
             }
         # SPATIAL OPERATORS (partial)
@@ -224,7 +291,9 @@ def cql_to_filter(cql_query: dict[str, t.Any]) -> dict[str, t.Any]:
 
             return {
                 "type": "geo_shape",
-                "field_name": cql_translate_fieldname(cql_query["args"][0]["property"]),
+                "field_name": cql_translate_fieldname(
+                    cql_query["args"][0]["property"], collection_ids=collection_ids
+                ),
                 "relation": cql_op[2:],
                 "shape": cql_query["args"][1],
             }
@@ -440,7 +509,9 @@ class DatabaseLogic:
     ):
         if filter_:
             search["filters"] = search.get("filters", [])
-            search["filters"].append(cql_to_filter(filter_))
+            search["filters"].append(
+                cql_to_filter(filter_, collection_ids=_extract_collection_ids(search))
+            )
         return search
 
     @staticmethod
