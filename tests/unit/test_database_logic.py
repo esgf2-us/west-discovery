@@ -560,38 +560,80 @@ def test_cql_to_filter_raises_value_error_for_like_with_non_string_pattern():
         cql_to_filter({"op": "like", "args": [{"property": "activity_id"}, 42]})
 
 
+# --- property name resolution (bare and qualified forms) ---
+
+# esgvoc names facets project-prefixed (cmip6:activity_id) and common fields
+# bare (retracted), matching the item's stored property keys.
+_CMIP6_KEYS = frozenset(
+    {"cmip6:activity_id", "cmip6:experiment_id", "cmip6:frequency", "retracted"}
+)
+
+
+@pytest.fixture
+def cmip6_keys(monkeypatch):
+    """Stub esgvoc property-key lookup so bare-name resolution is deterministic."""
+    monkeypatch.setattr(
+        database_logic, "collection_property_keys", lambda project_id: _CMIP6_KEYS
+    )
+
+
 @pytest.mark.parametrize(
     ("field", "expected"),
     [
-        # A bare name and its "properties."-qualified form are equivalent.
+        # Bare facet -> namespaced to the single scoped collection...
+        ("activity_id", "properties.cmip6:activity_id"),
+        # ...bare common field -> stored un-prefixed.
         ("retracted", "properties.retracted"),
-        ("properties.retracted", "properties.retracted"),
+        # Unknown bare field -> un-prefixed fallback.
         ("datetime", "properties.datetime"),
-        # Facet keys carry their prefix verbatim; it is not injected.
+        # Explicitly prefixed / already-qualified forms are accepted as-is.
         ("cmip6:activity_id", "properties.cmip6:activity_id"),
         ("properties.cmip6:activity_id", "properties.cmip6:activity_id"),
+        ("properties.retracted", "properties.retracted"),
     ],
 )
-def test_cql_to_filter_qualifies_property_transparently(field, expected):
-    result = cql_to_filter({"op": "=", "args": [{"property": field}, "x"]})
-    assert result == {
+def test_cql_to_filter_resolves_bare_and_qualified(field, expected, cmip6_keys):
+    result = cql_to_filter(
+        {"op": "=", "args": [{"property": field}, "x"]}, collection_ids=["CMIP6"]
+    )
+    assert result == {"type": "match_any", "field_name": expected, "values": ["x"]}
+
+
+def test_cql_to_filter_qualified_forms_need_no_collection():
+    # A qualified name resolves without any collection scope.
+    assert cql_to_filter(
+        {"op": "=", "args": [{"property": "cmip6:activity_id"}, "x"]}
+    ) == {
         "type": "match_any",
-        "field_name": expected,
+        "field_name": "properties.cmip6:activity_id",
         "values": ["x"],
     }
-
-
-def test_cql_to_filter_qualifies_without_a_collection_scope():
-    # Qualification is a pure prefix, so no collection scope is required.
-    result = cql_to_filter({"op": "=", "args": [{"property": "retracted"}, False]})
-    assert result == {
+    assert cql_to_filter(
+        {"op": "=", "args": [{"property": "properties.retracted"}, True]}
+    ) == {
         "type": "match_any",
         "field_name": "properties.retracted",
-        "values": [False],
+        "values": [True],
     }
 
 
-def test_apply_cql2_filter_qualifies_bare_property_among_other_filters():
+def test_cql_to_filter_bare_property_requires_a_single_collection():
+    # Zero collections: cannot tell facet from common -> helpful error.
+    with pytest.raises(ValueError, match="exactly one"):
+        cql_to_filter({"op": "=", "args": [{"property": "activity_id"}, "x"]})
+
+
+def test_cql_to_filter_bare_property_rejects_multiple_collections():
+    with pytest.raises(ValueError, match="exactly one"):
+        cql_to_filter(
+            {"op": "=", "args": [{"property": "activity_id"}, "x"]},
+            collection_ids=["CMIP6", "CMIP7"],
+        )
+
+
+def test_apply_cql2_filter_resolves_bare_facet_via_search_collection(cmip6_keys):
+    # apply_cql2_filter reads the collection from the search object, so a bare
+    # facet resolves to the per-collection namespace end to end.
     search = globus_sdk.SearchQuery()
     search["filters"] = [
         {"type": "exists", "field_name": "id"},
@@ -599,7 +641,7 @@ def test_apply_cql2_filter_qualifies_bare_property_among_other_filters():
     ]
 
     DatabaseLogic.apply_cql2_filter(
-        search, {"op": "like", "args": [{"property": "cmip6:experiment_id"}, "hist%"]}
+        search, {"op": "like", "args": [{"property": "experiment_id"}, "hist%"]}
     )
 
     assert search["filters"][-1] == {

@@ -195,12 +195,14 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
 
         search = self.database.apply_collections_filter(search, collections)
 
-        # Apply the CQL2 filter after the collection filter so the two stay
-        # consistent on the search object. Note the CQL2 filter path qualifies
-        # field names transparently now (properties.<name>, keys stored
-        # verbatim; see database_logic.cql_translate_fieldname) and no longer
-        # derives a per-collection namespace. The aggregation facet path below
-        # still namespaces bare facet names via the scoped collection.
+        # The CQL2 filter must be applied *after* the collection filter. A bare
+        # facet property (e.g. "frequency") resolves to a per-collection
+        # namespace ("properties.{collection}:frequency"), and apply_cql2_filter
+        # derives that namespace from the collection already present on the
+        # search object (see database_logic._extract_collection_ids /
+        # cql_translate_fieldname). Applying it earlier — before
+        # apply_collections_filter — leaves the collection invisible to the
+        # translation and fails with "require exactly one collection".
         if aggregate_request and aggregate_request.filter_expr:
             try:
                 search = self.database.apply_cql2_filter(
