@@ -28,11 +28,13 @@ def test_extract_summaries_from_schema(item_schema):
     assert summaries == {
         "activity_id": ["CMIP", "ScenarioMIP"],
         "frequency": ["mon", "day"],
-        "variant_label": r"^r\d+i\d+p\d+f\d+$",
-        "member_id": [
-            {"pattern": r"^r\d+i\d+p\d+f\d+$"},
-            {"pattern": r"^r\d+i\d+p\d+$"},
-        ],
+        "variant_label": {"type": "string", "pattern": r"^r\d+i\d+p\d+f\d+$"},
+        "member_id": {
+            "anyOf": [
+                {"pattern": r"^r\d+i\d+p\d+f\d+$"},
+                {"pattern": r"^r\d+i\d+p\d+$"},
+            ]
+        },
     }
 
 
@@ -108,11 +110,13 @@ def test_get_project_builds_stac_collection(monkeypatch, item_schema):
         "summaries": {
             "activity_id": ["CMIP", "ScenarioMIP"],
             "frequency": ["mon", "day"],
-            "variant_label": r"^r\d+i\d+p\d+f\d+$",
-            "member_id": [
-                {"pattern": r"^r\d+i\d+p\d+f\d+$"},
-                {"pattern": r"^r\d+i\d+p\d+$"},
-            ],
+            "variant_label": {"type": "string", "pattern": r"^r\d+i\d+p\d+f\d+$"},
+            "member_id": {
+                "anyOf": [
+                    {"pattern": r"^r\d+i\d+p\d+f\d+$"},
+                    {"pattern": r"^r\d+i\d+p\d+$"},
+                ]
+            },
         },
         "item_assets": {
             "data": {

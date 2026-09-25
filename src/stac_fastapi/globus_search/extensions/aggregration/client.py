@@ -99,6 +99,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
     # fields) should eventually be sourced from each collection's esgvoc
     # metadata rather than hard-coded here; see get_aggregations().
     COLLECTION_DEFAULT_AGGREGATIONS = {
+        "CMIP6Test": DEFAULT_FREQUENCY_AGGREGATIONS,
         "CMIP6": DEFAULT_FREQUENCY_AGGREGATIONS,
         "CMIP7": DEFAULT_FREQUENCY_AGGREGATIONS,
         "CORDEX-CMIP6": DEFAULT_FREQUENCY_AGGREGATIONS,
