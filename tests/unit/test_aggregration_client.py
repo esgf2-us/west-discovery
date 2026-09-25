@@ -348,6 +348,49 @@ def test_aggregate_adds_terms_facet_and_converts_buckets():
     }
 
 
+def test_aggregate_cmip6test_resolves_to_cmip6_namespace():
+    """CMIP6Test aliases the cmip6 vocabulary, so its items are indexed under
+    "properties.cmip6:...". The facet field must resolve to that namespace
+    rather than "properties.cmip6test:...", which holds no data (regression:
+    aggregate returned empty buckets while /search worked). Uses the user's
+    project-prefixed aggregation name to confirm the prefix is stripped too.
+    """
+    client = _client(
+        search_response={
+            "total": 3,
+            "facet_results": [
+                {
+                    "name": "source_id",
+                    "buckets": [{"value": "GFDL-CM4", "count": 3}],
+                }
+            ],
+        }
+    )
+
+    result = asyncio.run(
+        client.aggregate(
+            aggregations=["cmip6_source_id_frequency"],
+            collections=["CMIP6Test"],
+            size=5,
+            request=_request(),
+        )
+    )
+
+    _, search = client.client.calls[0]
+    # Collection filter keeps the real id; only the property namespace is aliased.
+    assert search["collections"] == ["CMIP6Test"]
+    assert search["facets"] == [
+        {
+            "name": "source_id",
+            "field_name": "properties.cmip6:source_id",
+            "type": "terms",
+            "size": 5,
+        }
+    ]
+    assert result["aggregations"][0]["name"] == "cmip6_source_id_frequency"
+    assert result["aggregations"][0]["buckets"][0]["key"] == "GFDL-CM4"
+
+
 def test_aggregate_supports_common_alternate_name_frequency():
     client = _client(
         search_response={
