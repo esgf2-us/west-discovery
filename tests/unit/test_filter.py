@@ -5,10 +5,19 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from stac_fastapi.core.extensions.filter import DEFAULT_QUERYABLES
 
+from stac_fastapi.globus_search import filter as filter_mod
 from stac_fastapi.globus_search.filter import (
     GlobusSearchFiltersClient,
     _infer_json_schema_type,
 )
+
+
+@pytest.fixture
+def no_esgvoc_queryables(monkeypatch):
+    """Force the esgvoc lookup to return nothing so get_queryables exercises its
+    DB-sampling / default-only fallback branches, independent of whichever
+    esgvoc CV version happens to be installed."""
+    monkeypatch.setattr(filter_mod, "_build_esgvoc_queryables", lambda collection_id: {})
 
 
 def _make_database(items=None):
@@ -121,7 +130,7 @@ def test_collection_queryables_adds_item_properties(db):
     assert "cmip6:variable_id" in result["properties"]
 
 
-def test_collection_queryables_infers_types_from_item_values(db):
+def test_collection_queryables_infers_types_from_item_values(db, no_esgvoc_queryables):
     db.execute_search = AsyncMock(
         return_value=(
             [
@@ -221,7 +230,7 @@ def test_collection_queryables_title_derived_from_key(db):
     assert result["properties"]["cmip6:activity_id"]["title"] == "Cmip6:Activity Id"
 
 
-def test_collection_queryables_passes_collection_id_to_database(db):
+def test_collection_queryables_passes_collection_id_to_database(db, no_esgvoc_queryables):
     client = GlobusSearchFiltersClient(database=db)
     asyncio.run(client.get_queryables(collection_id="CMIP6"))
 
@@ -231,7 +240,9 @@ def test_collection_queryables_passes_collection_id_to_database(db):
 # --- No-database fallback ---
 
 
-def test_collection_queryables_without_database_returns_default_queryables():
+def test_collection_queryables_without_database_returns_default_queryables(
+    no_esgvoc_queryables,
+):
     client = GlobusSearchFiltersClient(database=None)
 
     result = asyncio.run(client.get_queryables(collection_id="CMIP6"))
@@ -242,7 +253,7 @@ def test_collection_queryables_without_database_returns_default_queryables():
 # --- Error handling ---
 
 
-def test_collection_queryables_handles_empty_collection(db):
+def test_collection_queryables_handles_empty_collection(db, no_esgvoc_queryables):
     db.execute_search = AsyncMock(return_value=([], 0, None))
     client = GlobusSearchFiltersClient(database=db)
 
@@ -251,7 +262,7 @@ def test_collection_queryables_handles_empty_collection(db):
     assert result["properties"] == DEFAULT_QUERYABLES
 
 
-def test_collection_queryables_handles_search_exception(db):
+def test_collection_queryables_handles_search_exception(db, no_esgvoc_queryables):
     db.execute_search = AsyncMock(side_effect=Exception("search failed"))
     client = GlobusSearchFiltersClient(database=db)
 
