@@ -1,3 +1,11 @@
+[project]
+name = "stac-fastapi-globus-search"
+version = "1.0.0"
+description = "A STAC API backed by Globus Search, exposing ESGF climate datasets as STAC Collections and Items."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
 [tool.pytest.ini_options]
 addopts = [
   "--strict-config",
