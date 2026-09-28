@@ -17,7 +17,9 @@ def no_esgvoc_queryables(monkeypatch):
     """Force the esgvoc lookup to return nothing so get_queryables exercises its
     DB-sampling / default-only fallback branches, independent of whichever
     esgvoc CV version happens to be installed."""
-    monkeypatch.setattr(filter_mod, "_build_esgvoc_queryables", lambda collection_id: {})
+    monkeypatch.setattr(
+        filter_mod, "_build_esgvoc_queryables", lambda collection_id: {}
+    )
 
 
 def _make_database(items=None):
@@ -230,7 +232,9 @@ def test_collection_queryables_title_derived_from_key(db):
     assert result["properties"]["cmip6:activity_id"]["title"] == "Cmip6:Activity Id"
 
 
-def test_collection_queryables_passes_collection_id_to_database(db, no_esgvoc_queryables):
+def test_collection_queryables_passes_collection_id_to_database(
+    db, no_esgvoc_queryables
+):
     client = GlobusSearchFiltersClient(database=db)
     asyncio.run(client.get_queryables(collection_id="CMIP6"))
 
