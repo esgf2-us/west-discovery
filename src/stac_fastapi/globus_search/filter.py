@@ -12,10 +12,33 @@ from typing import Any, Dict, Optional
 import attr
 import esgvoc.api.projects as ev
 from esgvoc.apps.jsg.json_schema_generator import generate_json_schema
+from pydantic import AliasChoices, ConfigDict, Field
 from stac_fastapi.core.extensions.filter import DEFAULT_QUERYABLES
 from stac_fastapi.extensions.core.filter.client import AsyncBaseFiltersClient
+from stac_fastapi.extensions.core.filter.request import (
+    FilterExtensionGetRequest,
+    FilterExtensionPostRequest,
+)
 
 logger = logging.getLogger(__name__)
+
+
+@attr.s
+class GlobusFilterExtensionGetRequest(FilterExtensionGetRequest):
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class GlobusFilterExtensionPostRequest(FilterExtensionPostRequest):
+    # Accept the CQL2 filter under either "filter" (STAC spec) or "filter_expr".
+    # The alias lives on the field (not model_config) so it survives the field
+    # copy performed by create_post_request_model when the /search body model is
+    # assembled; a model-level populate_by_name would be dropped there.
+    filter_expr: Optional[Dict[str, Any]] = Field(
+        default=None,
+        validation_alias=AliasChoices("filter", "filter_expr"),
+        serialization_alias="filter",
+        description="A CQL2 filter expression. Accepts 'filter' or 'filter_expr'.",
+    )
 
 
 @lru_cache(maxsize=None)

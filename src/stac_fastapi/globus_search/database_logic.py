@@ -13,7 +13,12 @@ from starlette.requests import Request
 
 from .config import settings
 from .convert import search_doc_to_stac_item
-from .utility import collection_property_keys, get_project, list_projects
+from .utility import (
+    collection_property_keys,
+    get_project,
+    list_projects,
+    project_namespace,
+)
 
 _client = settings.search_client
 
@@ -42,17 +47,24 @@ def cql_like_to_globus_like(pattern: str) -> str:
 
 
 def _collection_property_prefix(collection_ids: list[str] | None) -> str | None:
-    """Return the single collection's lowercased id, or None if not exactly one.
+    """Return the single collection's property namespace, or None if not exactly one.
 
     Used to namespace bare facet names to their per-collection index field
-    ("properties.<collection>:<facet>") on both the CQL2 filter path
+    ("properties.<namespace>:<facet>") on both the CQL2 filter path
     (``cql_translate_fieldname``) and the aggregation extension. A bare property
     can only be resolved against exactly one collection, so zero or multiple
     collections return None (callers raise a helpful error).
+
+    The namespace is usually the collection's lowercased id, but some
+    collections alias another project's vocabulary (e.g. CMIP6Test -> cmip6);
+    ``project_namespace`` resolves those so facets/filters target the real
+    indexed field ("properties.cmip6:...") rather than a namespace that holds
+    no data. The alias affects only the property namespace — collection
+    filtering still uses the real collection id.
     """
     if not collection_ids or len(collection_ids) != 1:
         return None
-    return collection_ids[0].lower()
+    return project_namespace(collection_ids[0])
 
 
 # CQL2 properties whose index field does not live under "properties.". For

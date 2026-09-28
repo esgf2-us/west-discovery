@@ -30,7 +30,11 @@ from stac_fastapi.globus_search.extensions.aggregration import (
 from stac_fastapi.globus_search.extensions.aggregration.client import (
     GlobusSearchAggregationClient,
 )
-from stac_fastapi.globus_search.filter import GlobusSearchFiltersClient
+from stac_fastapi.globus_search.filter import (
+    GlobusSearchFiltersClient,
+    GlobusFilterExtensionGetRequest,
+    GlobusFilterExtensionPostRequest,
+)
 
 
 async def require_json(content_type: str = Header(..., alias="content-type")):
@@ -53,6 +57,8 @@ aggregation_extension.GET = GlobusAggregationExtensionGetRequest
 filter_extension = FilterExtension(
     client=GlobusSearchFiltersClient(database=database_logic)
 )
+filter_extension.GET = GlobusFilterExtensionGetRequest
+filter_extension.POST = GlobusFilterExtensionPostRequest
 filter_extension.conformance_classes.append(
     "http://www.opengis.net/spec/cql2/1.0/conf/advanced-comparison-operators"
 )

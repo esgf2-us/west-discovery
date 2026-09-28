@@ -11,6 +11,27 @@ from stac_fastapi.core.extensions.filter import DEFAULT_QUERYABLES
 logger = logging.getLogger(__name__)
 
 
+# Collections whose indexed property namespace differs from their id. CMIP6Test
+# reuses the cmip6 project vocabulary in esgvoc 4.0.0, so its items are indexed
+# under "properties.cmip6:...". This is a temporary alias tied to that esgvoc
+# version and should be revisited when the CV changes. Single source of truth
+# for both collection-document building (_build_project) and field-namespace
+# resolution (database_logic._collection_property_prefix).
+COLLECTION_NAMESPACE_ALIASES = {"cmip6test": "cmip6"}
+
+
+def project_namespace(collection_id: str) -> str:
+    """Map a collection id to the project namespace its properties use.
+
+    Most collections use their own lowercased id as the property namespace
+    (e.g. "CMIP6" -> "cmip6"). A few are aliases for another project's
+    vocabulary (see COLLECTION_NAMESPACE_ALIASES) and resolve to that project's
+    namespace instead (e.g. "CMIP6Test" -> "cmip6").
+    """
+    key = collection_id.lower()
+    return COLLECTION_NAMESPACE_ALIASES.get(key, key)
+
+
 @lru_cache(maxsize=None)
 def collection_property_keys(project_id: str) -> frozenset[str]:
     """Return the item property keys for a project, exactly as esgvoc names them.
@@ -69,10 +90,13 @@ def _extract_summaries_from_schema(schema: dict) -> dict:
         if "enum" in inner:
             summaries[field_name] = inner["enum"]
         elif "pattern" in inner:
-            summaries[field_name] = inner["pattern"]
+            # STAC summaries can't be bare strings; wrap the regex as a JSON
+            # Schema object (the "JSON Schema" summary form).
+            summaries[field_name] = {"type": "string", "pattern": inner["pattern"]}
         elif "anyOf" in inner:
-            # Composite terms expressed as a union of patterns
-            summaries[field_name] = inner["anyOf"]
+            # Composite terms expressed as a union of patterns. Wrap as a JSON
+            # Schema object so the summary is a schema, not a bare list.
+            summaries[field_name] = {"anyOf": inner["anyOf"]}
         # else: source_collection was null → only "type" present → skip
 
     return summaries
@@ -88,8 +112,8 @@ def _build_project(project_id: str = "cmip6") -> dict:
     Compatible with esgvoc >= 4.0.0.
     """
     # ── 1. Project-level metadata ─────────────────────────────────────────────
-    if project_id == "CMIP6Test":
-        project_id = "cmip6"  # alias for CMIP6Test in esgvoc 4.0.0
+    # Resolve collection→project aliases (e.g. CMIP6Test -> cmip6) centrally.
+    project_id = project_namespace(project_id)
     specs = ev.get_project(project_id.lower())
     if specs is None:
         raise ValueError(f"Project '{project_id}' not found in esgvoc")
