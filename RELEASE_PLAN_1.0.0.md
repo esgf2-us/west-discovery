@@ -3,8 +3,10 @@
 Runbook for merging `integration` → `main` and cutting the `v1.0.0` production release.
 Repo: `git@github.com:esgf2-us/west-discovery.git`
 
-> This is a plan only. Nothing in the repo has been changed. Each step below is
-> something you (or I, on request) run when you're ready.
+> **Status (updated 2026-09-28):** The `release/1.0.0` branch has been created off
+> `integration`, and the prep changes (version, LICENSE, CHANGELOG) are written to the
+> working tree but **not yet committed**. Remaining: commit, open the PR, merge, tag,
+> release. See §3 for exactly what's done vs. outstanding.
 
 ---
 
@@ -13,10 +15,10 @@ Repo: `git@github.com:esgf2-us/west-discovery.git`
 | Check | Result |
 |---|---|
 | Release candidate branch | `integration` — **58 commits ahead of `origin/main`, 0 behind** |
-| Working tree | Clean |
-| Unit tests | **200 passed** |
+| Release branch | `release/1.0.0` created off `integration`; prep changes staged in working tree, **not yet committed** |
+| Unit tests | **200 passed** (re-verified after version bump) |
 | Coverage | **95%** (`src/stac_fastapi/globus_search`) |
-| `black --check` | Clean (19 files) |
+| `black --check` | Clean (19 files, incl. edited `__init__.py`) |
 | Secrets | `.env` is gitignored and **not** tracked — no leak |
 
 The code is in good shape. The gaps below are release *hygiene*, not code defects.
@@ -27,72 +29,65 @@ The code is in good shape. The gaps below are release *hygiene*, not code defect
 
 | # | Item | Status | Notes |
 |---|---|---|---|
-| 1 | **No version defined** | ❌ Blocker | `pyproject.toml` has no `[project]` table; no `__version__`. A 1.0.0 release needs one. |
-| 2 | **No LICENSE** | ❌ Blocker | Public release under `esgf2-us` should carry a license. You chose **MIT**. |
-| 3 | **No CHANGELOG** | ⚠️ Include | Draft provided in §4. |
+| 1 | **Version defined** | ✅ Done | `[project]` table with `version = "1.0.0"` added to `pyproject.toml`; `__version__ = "1.0.0"` in `__init__.py`. TOML parses; tests still pass. Uncommitted. |
+| 2 | **LICENSE** | ✅ Done | `LICENSE` (MIT) added at repo root. Confirm the copyright line (`2026 ESGF2-US contributors`) matches ESGF/UChicago policy before committing. |
+| 3 | **CHANGELOG** | ✅ Done | `CHANGELOG.md` added with the 1.0.0 section. Uncommitted. |
 | 4 | CI/CD | ⏭️ Deferred | No `.github/`. You opted out for 1.0.0. A stale `add-ci-cd` branch exists on origin if you revisit. |
 | 5 | Lint config gaps | ⚠️ Optional | No `ruff`/`isort` config in `pyproject.toml`; run with defaults they report style noise that disagrees with the project's actual `.flake8` (line-length 88, ignores E203/W503/W504) and with `black`. Not release-blocking, but worth a follow-up. |
 | 6 | `globus_sdk` deprecation | ℹ️ Note | Tests emit `RemovedInV4Warning: 'SearchQuery' is deprecated`. Fine for 1.0.0 on `globus_sdk==3.62.0`; track before any v4 bump. |
 | 7 | ~40 stale origin branches | ⏭️ Post-release | Cleanup listed in §8. |
 
+The three release-hygiene blockers (1–3) are now resolved in the working tree of
+`release/1.0.0`. What remains is committing them, then the merge/tag/release flow.
+
 ---
 
 ## 3. Runbook
 
-### Phase 0 — Prep branch (do the doc/version work here, not on `integration` directly)
+### Phase 0 — Prep branch ✅ Done
+
+`release/1.0.0` has been created off `integration`.
+
+### Phase 1 — Add version ✅ Done
+
+`[project]` table added to `pyproject.toml` and `__version__ = "1.0.0"` set in
+`src/stac_fastapi/globus_search/__init__.py`. (Content reference in §4/§5.)
+
+### Phase 2 — Add LICENSE ✅ Done
+
+`LICENSE` (MIT) created at repo root. **Confirm the copyright line** before
+committing (see §5).
+
+### Phase 3 — Add CHANGELOG ✅ Done
+
+`CHANGELOG.md` created (see §4).
+
+### Phase 4 — Commit prep, then open PR ⬜ Outstanding
+
+The prep edits are in the working tree of `release/1.0.0` but not committed. The
+commit must be run in your local environment (the agent sandbox mount blocks the
+`.git/*.lock` cleanup git needs, so it can't run `git add`/`git commit` there).
 
 ```bash
-git checkout integration && git pull
-git checkout -b release/1.0.0
-```
+cd ~/Projects/python/globus/west-discovery
 
-### Phase 1 — Add version (Blocker #1)
+# one-time cleanup of stale locks + agent probe artifacts (safe to run)
+rm -f .git/index.lock .git/packed-refs.lock .git/refs/heads/_probe_branch.lock
+rm -f _b _c _perm_test
+git branch -D _probe_branch 2>/dev/null || true
 
-Add a `[project]` table to `pyproject.toml` (it currently only has pytest/coverage config):
-
-```toml
-[project]
-name = "stac-fastapi-globus-search"
-version = "1.0.0"
-description = "A STAC API backed by Globus Search, exposing ESGF climate datasets."
-readme = "README.md"
-requires-python = ">=3.10"
-license = { text = "MIT" }
-```
-
-And expose it in `src/stac_fastapi/globus_search/__init__.py`:
-
-```python
-__version__ = "1.0.0"
-```
-
-### Phase 2 — Add LICENSE (Blocker #2)
-
-Create `LICENSE` in the repo root with the standard MIT text. Confirm the copyright
-line — suggested: `Copyright (c) 2026 ESGF2-US contributors`. (Full text drafted in §5.)
-
-### Phase 3 — Add CHANGELOG (Item #3)
-
-Create `CHANGELOG.md` from the draft in §4.
-
-### Phase 4 — Commit prep, verify, open PR
-
-```bash
-# verify green before opening the PR
+# verify green
 python -m pytest            # expect 200 passed
 black --check src tests     # expect clean
 
-git add pyproject.toml src/stac_fastapi/globus_search/__init__.py LICENSE CHANGELOG.md
+git status                  # expect: pyproject.toml + __init__.py modified; LICENSE, CHANGELOG.md, RELEASE_PLAN_1.0.0.md new
+git add pyproject.toml src/stac_fastapi/globus_search/__init__.py LICENSE CHANGELOG.md RELEASE_PLAN_1.0.0.md
 git commit -m "chore(release): prepare 1.0.0 (version, LICENSE, CHANGELOG)"
 git push -u origin release/1.0.0
 ```
 
-Open a PR **`release/1.0.0` → `main`** on GitHub (per your choice to merge via PR).
+Then open a PR **`release/1.0.0` → `main`** on GitHub (per your choice to merge via PR).
 Title: `Release 1.0.0`. Use the CHANGELOG as the PR description.
-
-> Alternative if you'd rather not add a prep branch: PR `integration → main`
-> directly and land the version/LICENSE/CHANGELOG commits on `integration` first.
-> The prep branch keeps `integration` untouched until the release is approved.
 
 ### Phase 5 — Merge
 
@@ -123,7 +118,7 @@ Create the GitHub Release from tag `v1.0.0`, titled `1.0.0`, body = the CHANGELO
 
 ---
 
-## 4. Draft CHANGELOG.md
+## 4. CHANGELOG.md content (applied to `CHANGELOG.md`)
 
 ```markdown
 # Changelog
@@ -168,7 +163,7 @@ free-text search, and queryables derived from ESGF controlled vocabularies.
 
 ---
 
-## 5. Draft LICENSE (MIT)
+## 5. LICENSE content (applied to `LICENSE`)
 
 ```
 MIT License
@@ -201,12 +196,13 @@ SOFTWARE.
 
 ## 6. Pre-flight checklist (tick before you tag)
 
-- [ ] `[project]` table with `version = "1.0.0"` added to `pyproject.toml`
-- [ ] `__version__ = "1.0.0"` in `__init__.py`
-- [ ] `LICENSE` (MIT) added, copyright holder confirmed
-- [ ] `CHANGELOG.md` added
-- [ ] `python -m pytest` → 200 passed
-- [ ] `black --check src tests` → clean
+- [x] `[project]` table with `version = "1.0.0"` added to `pyproject.toml`
+- [x] `__version__ = "1.0.0"` in `__init__.py`
+- [x] `LICENSE` (MIT) added — ⚠️ copyright holder still to be confirmed
+- [x] `CHANGELOG.md` added
+- [x] `python -m pytest` → 200 passed
+- [x] `black --check src tests` → clean
+- [ ] Prep changes committed on `release/1.0.0` (see Phase 4)
 - [ ] Docker image builds: `docker build --target production -t discovery-api:1.0.0 .`
 - [ ] PR `release/1.0.0` → `main` opened, reviewed, approved
 - [ ] Merged to `main`
