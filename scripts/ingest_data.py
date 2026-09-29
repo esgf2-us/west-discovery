@@ -132,9 +132,7 @@ def do_login_flow(
     client.oauth2_start_flow(
         requested_scopes=globus_sdk.SearchClient.scopes.all, refresh_tokens=True
     )
-    print(
-        f"Please go to this URL and login:\n\n" f"{client.oauth2_get_authorize_url()}\n"
-    )
+    print(f"Please go to this URL and login:\n\n{client.oauth2_get_authorize_url()}\n")
     auth_code = input("Please enter the code here: ").strip()
     return client.oauth2_exchange_code_for_tokens(auth_code)
 

@@ -234,7 +234,6 @@ def cql_to_filter(
             # we only have '<=' and '>=' in Search today
             raise NotImplementedError("'>' and '<' filters are not supported yet")
         case "isNull":
-
             # isNull => not(exists)
             return {
                 "type": "not",
@@ -246,7 +245,6 @@ def cql_to_filter(
                 },
             }
         case "<=":
-
             value = cql_query["args"][1]
             return {
                 "type": "range",
@@ -256,7 +254,6 @@ def cql_to_filter(
                 "values": [{"from": "*", "to": value}],
             }
         case ">=":
-
             value = cql_query["args"][1]
             return {
                 "type": "range",
@@ -288,7 +285,6 @@ def cql_to_filter(
             # range filter should work
             raise NotImplementedError("'between' filter is not supported yet")
         case "in":
-
             return {
                 "type": "match_any",
                 "field_name": cql_translate_fieldname(
@@ -300,7 +296,6 @@ def cql_to_filter(
         # note that this divides in the filter spec between "Basic Spatial Operators"
         # and "Spatial Operators"
         case "s_intersects" | "s_within":
-
             return {
                 "type": "geo_shape",
                 "field_name": cql_translate_fieldname(

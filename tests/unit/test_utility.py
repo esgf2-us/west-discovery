@@ -132,8 +132,7 @@ def test_get_project_builds_stac_collection(monkeypatch, item_schema):
                 "href": "https://github.com/WCRP-CMIP/CMIP6_CVs",
                 "type": "text/html",
                 "title": (
-                    "CMIP6 CV \u2014 dataset_id template: "
-                    "{activity_id}.{experiment_id}"
+                    "CMIP6 CV \u2014 dataset_id template: {activity_id}.{experiment_id}"
                 ),
             },
             {
