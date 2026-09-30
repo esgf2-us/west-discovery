@@ -1,36 +1,31 @@
 import asyncio
+from unittest.mock import MagicMock
 
 import globus_sdk
 import pytest
+import requests
+import requests.structures
 
 from stac_fastapi.globus_search import database_logic
 from stac_fastapi.globus_search.database_logic import (
     DatabaseLogic,
     cql_like_to_globus_like,
     cql_to_filter,
-    cql_translate_fieldname,
+    parse_datetime_interval,
 )
 
 
-@pytest.mark.parametrize(
-    ("fieldname", "expected"),
-    [
-        ("id", "id"),
-        ("collection", "collection"),
-        ("geometry", "geometry"),
-        ("activity_id", "properties.activity_id"),
-        ("cmip6:activity_id", "properties.cmip6:activity_id"),
-    ],
-)
-def test_cql_translate_fieldname(fieldname, expected):
-    assert cql_translate_fieldname(fieldname) == expected
-
-
-def test_cql_translate_fieldname_uses_single_collection_prefix():
-    assert (
-        cql_translate_fieldname("experiment_id", collection_ids=["CMIP6"])
-        == "properties.cmip6:experiment_id"
-    )
+def make_search_api_error(status_code):
+    resp = requests.models.Response()
+    resp.status_code = status_code
+    resp._content = b"{}"
+    resp.encoding = "utf-8"
+    req = requests.models.PreparedRequest()
+    req.method = "GET"
+    req.url = "https://example.com"
+    req.headers = requests.structures.CaseInsensitiveDict()
+    resp.request = req
+    return globus_sdk.SearchAPIError(resp)
 
 
 @pytest.mark.parametrize(
@@ -48,7 +43,6 @@ def test_cql_like_to_globus_like(pattern, expected):
 @pytest.mark.parametrize(
     ("cql_query", "expected"),
     [
-        ({}, {}),
         (
             {"op": "=", "args": [{"property": "collection"}, "CMIP6"]},
             {
@@ -69,7 +63,7 @@ def test_cql_like_to_globus_like(pattern, expected):
             },
         ),
         (
-            {"op": "isNull", "args": [{"property": "variable_id"}]},
+            {"op": "isNull", "args": [{"property": "properties.variable_id"}]},
             {
                 "type": "not",
                 "filter": {
@@ -79,7 +73,7 @@ def test_cql_like_to_globus_like(pattern, expected):
             },
         ),
         (
-            {"op": "<=", "args": [{"property": "datetime"}, "2026-01-01"]},
+            {"op": "<=", "args": [{"property": "properties.datetime"}, "2026-01-01"]},
             {
                 "type": "range",
                 "field_name": "properties.datetime",
@@ -87,7 +81,7 @@ def test_cql_like_to_globus_like(pattern, expected):
             },
         ),
         (
-            {"op": ">=", "args": [{"property": "datetime"}, "2025-01-01"]},
+            {"op": ">=", "args": [{"property": "properties.datetime"}, "2025-01-01"]},
             {
                 "type": "range",
                 "field_name": "properties.datetime",
@@ -138,12 +132,26 @@ def test_cql_to_filter_translates_supported_filters(cql_query, expected):
     assert cql_to_filter(cql_query) == expected
 
 
+def test_cql_to_filter_maps_alternate_name_to_assets_field():
+    result = cql_to_filter(
+        {"op": "=", "args": [{"property": "alternate:name"}, "eagle.alcf.anl.gov"]}
+    )
+    assert result == {
+        "type": "match_any",
+        "field_name": "assets.alternate:name",
+        "values": ["eagle.alcf.anl.gov"],
+    }
+
+
 def test_cql_to_filter_translates_boolean_groups():
     cql_query = {
         "op": "and",
         "args": [
             {"op": "=", "args": [{"property": "collection"}, "CMIP6"]},
-            {"op": "in", "args": [{"property": "variable_id"}, ["tas", "pr"]]},
+            {
+                "op": "in",
+                "args": [{"property": "properties.variable_id"}, ["tas", "pr"]],
+            },
         ],
     }
 
@@ -324,24 +332,6 @@ def test_apply_cql2_filter_appends_translated_filter():
     ]
 
 
-def test_apply_cql2_filter_uses_collection_prefix_for_property_filters():
-    search = globus_sdk.SearchQuery()
-    search["filters"] = [
-        {"type": "match_any", "field_name": "collection", "values": ["CMIP6"]}
-    ]
-
-    returned = DatabaseLogic.apply_cql2_filter(
-        search, {"op": "like", "args": [{"property": "experiment_id"}, "hist%"]}
-    )
-
-    assert returned is search
-    assert search["filters"][-1] == {
-        "type": "like",
-        "field_name": "properties.cmip6:experiment_id",
-        "value": "hist*",
-    }
-
-
 def test_apply_cql2_filter_leaves_search_unchanged_without_filter():
     search = globus_sdk.SearchQuery()
 
@@ -520,3 +510,260 @@ def test_execute_search_sets_pagination_token(monkeypatch):
     )
 
     assert result == ([], 0, None)
+
+
+# --- cql_to_filter: new ValueError paths ---
+
+
+def test_cql_to_filter_raises_value_error_for_missing_op():
+    with pytest.raises(ValueError, match="'op' field"):
+        cql_to_filter({})
+
+
+@pytest.mark.parametrize("operator", ["=", "<>"])
+def test_cql_to_filter_raises_value_error_for_wrong_arg_count(operator):
+    with pytest.raises(ValueError, match="exactly 2 arguments"):
+        cql_to_filter({"op": operator, "args": [{"property": "x"}]})
+
+
+def test_cql_to_filter_raises_value_error_for_like_wrong_arg_count():
+    with pytest.raises(ValueError, match="exactly 2 arguments"):
+        cql_to_filter({"op": "like", "args": [{"property": "x"}]})
+
+
+def test_cql_to_filter_raises_value_error_for_like_non_string_pattern():
+    with pytest.raises(ValueError, match="string pattern"):
+        cql_to_filter({"op": "like", "args": [{"property": "x"}, 42]})
+
+
+# --- get_one_item: error paths ---
+
+
+def test_get_one_item_propagates_search_api_error(monkeypatch):
+    class FakeClient:
+        def get_subject(self, index_id, item_id):
+            raise make_search_api_error(500)
+
+    monkeypatch.setattr(database_logic, "_client", FakeClient())
+
+    with pytest.raises(globus_sdk.SearchAPIError):
+        asyncio.run(DatabaseLogic().get_one_item("CMIP6", "item-1"))
+
+
+def test_cql_like_to_globus_like_raises_on_trailing_escape():
+    with pytest.raises(ValueError, match="cannot end with an escape character"):
+        cql_like_to_globus_like("hist\\")
+
+
+def test_cql_to_filter_raises_value_error_for_like_with_non_string_pattern():
+    with pytest.raises(ValueError, match="requires a string pattern"):
+        cql_to_filter({"op": "like", "args": [{"property": "activity_id"}, 42]})
+
+
+# --- property name resolution (bare and qualified forms) ---
+
+# esgvoc names facets project-prefixed (cmip6:activity_id) and common fields
+# bare (retracted), matching the item's stored property keys.
+_CMIP6_KEYS = frozenset(
+    {"cmip6:activity_id", "cmip6:experiment_id", "cmip6:frequency", "retracted"}
+)
+
+
+@pytest.fixture
+def cmip6_keys(monkeypatch):
+    """Stub esgvoc property-key lookup so bare-name resolution is deterministic."""
+    monkeypatch.setattr(
+        database_logic, "collection_property_keys", lambda project_id: _CMIP6_KEYS
+    )
+
+
+@pytest.mark.parametrize(
+    ("field", "expected"),
+    [
+        # Bare facet -> namespaced to the single scoped collection...
+        ("activity_id", "properties.cmip6:activity_id"),
+        # ...bare common field -> stored un-prefixed.
+        ("retracted", "properties.retracted"),
+        # Unknown bare field -> un-prefixed fallback.
+        ("datetime", "properties.datetime"),
+        # Explicitly prefixed / already-qualified forms are accepted as-is.
+        ("cmip6:activity_id", "properties.cmip6:activity_id"),
+        ("properties.cmip6:activity_id", "properties.cmip6:activity_id"),
+        ("properties.retracted", "properties.retracted"),
+    ],
+)
+def test_cql_to_filter_resolves_bare_and_qualified(field, expected, cmip6_keys):
+    result = cql_to_filter(
+        {"op": "=", "args": [{"property": field}, "x"]}, collection_ids=["CMIP6"]
+    )
+    assert result == {"type": "match_any", "field_name": expected, "values": ["x"]}
+
+
+def test_cql_to_filter_qualified_forms_need_no_collection():
+    # A qualified name resolves without any collection scope.
+    assert cql_to_filter(
+        {"op": "=", "args": [{"property": "cmip6:activity_id"}, "x"]}
+    ) == {
+        "type": "match_any",
+        "field_name": "properties.cmip6:activity_id",
+        "values": ["x"],
+    }
+    assert cql_to_filter(
+        {"op": "=", "args": [{"property": "properties.retracted"}, True]}
+    ) == {
+        "type": "match_any",
+        "field_name": "properties.retracted",
+        "values": [True],
+    }
+
+
+def test_cql_to_filter_bare_property_requires_a_single_collection():
+    # Zero collections: cannot tell facet from common -> helpful error.
+    with pytest.raises(ValueError, match="exactly one"):
+        cql_to_filter({"op": "=", "args": [{"property": "activity_id"}, "x"]})
+
+
+def test_cql_to_filter_bare_property_rejects_multiple_collections():
+    with pytest.raises(ValueError, match="exactly one"):
+        cql_to_filter(
+            {"op": "=", "args": [{"property": "activity_id"}, "x"]},
+            collection_ids=["CMIP6", "CMIP7"],
+        )
+
+
+def test_apply_cql2_filter_resolves_bare_facet_via_search_collection(cmip6_keys):
+    # apply_cql2_filter reads the collection from the search object, so a bare
+    # facet resolves to the per-collection namespace end to end.
+    search = globus_sdk.SearchQuery()
+    search["filters"] = [
+        {"type": "exists", "field_name": "id"},
+        {"type": "match_any", "field_name": "collection", "values": ["CMIP6"]},
+    ]
+
+    DatabaseLogic.apply_cql2_filter(
+        search, {"op": "like", "args": [{"property": "experiment_id"}, "hist%"]}
+    )
+
+    assert search["filters"][-1] == {
+        "type": "like",
+        "field_name": "properties.cmip6:experiment_id",
+        "value": "hist*",
+    }
+
+
+def test_execute_search_propagates_search_api_error(monkeypatch):
+    r = MagicMock()
+    r.status_code = 503
+    r.headers = {"Content-Type": "text/plain"}
+    r.text = "service unavailable"
+    r.json.side_effect = ValueError("not json")
+    api_error = globus_sdk.SearchAPIError(r)
+
+    class FakeClient:
+        def scroll(self, index_id, search):
+            raise api_error
+
+    monkeypatch.setattr(database_logic, "_client", FakeClient())
+
+    with pytest.raises(globus_sdk.SearchAPIError):
+        asyncio.run(
+            DatabaseLogic().execute_search(
+                search=globus_sdk.SearchScrollQuery(),
+                limit=10,
+                token=None,
+                sort=None,
+                collection_ids=None,
+            )
+        )
+
+
+# --- datetime parsing and filtering ---
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("2020-06-01T00:00:00Z", ("2020-06-01T00:00:00Z", "2020-06-01T00:00:00Z")),
+        ("1850-01-01/2015-01-01", ("1850-01-01", "2015-01-01")),
+        ("../2015-01-01", (None, "2015-01-01")),
+        ("1850-01-01/..", ("1850-01-01", None)),
+        ("/", (None, None)),
+        (None, (None, None)),
+    ],
+)
+def test_parse_datetime_interval(value, expected):
+    assert parse_datetime_interval(value) == expected
+
+
+def test_apply_datetime_filter_closed_interval_intersects_on_start_and_end():
+    search = globus_sdk.SearchQuery()
+
+    DatabaseLogic.apply_datetime_filter(search, "1850-01-01/2015-01-01")
+
+    assert search["filters"] == [
+        {
+            "type": "range",
+            "field_name": "properties.start_datetime",
+            "values": [{"from": "*", "to": "2015-01-01"}],
+        },
+        {
+            "type": "range",
+            "field_name": "properties.end_datetime",
+            "values": [{"from": "1850-01-01", "to": "*"}],
+        },
+    ]
+
+
+def test_apply_datetime_filter_single_instant_bounds_both_fields():
+    search = globus_sdk.SearchQuery()
+
+    DatabaseLogic.apply_datetime_filter(search, "2000-01-01T00:00:00Z")
+
+    assert search["filters"] == [
+        {
+            "type": "range",
+            "field_name": "properties.start_datetime",
+            "values": [{"from": "*", "to": "2000-01-01T00:00:00Z"}],
+        },
+        {
+            "type": "range",
+            "field_name": "properties.end_datetime",
+            "values": [{"from": "2000-01-01T00:00:00Z", "to": "*"}],
+        },
+    ]
+
+
+def test_apply_datetime_filter_open_start_only_constrains_start_datetime():
+    search = globus_sdk.SearchQuery()
+
+    DatabaseLogic.apply_datetime_filter(search, "../2015-01-01")
+
+    assert search["filters"] == [
+        {
+            "type": "range",
+            "field_name": "properties.start_datetime",
+            "values": [{"from": "*", "to": "2015-01-01"}],
+        },
+    ]
+
+
+def test_apply_datetime_filter_open_end_only_constrains_end_datetime():
+    search = globus_sdk.SearchQuery()
+
+    DatabaseLogic.apply_datetime_filter(search, "1850-01-01/..")
+
+    assert search["filters"] == [
+        {
+            "type": "range",
+            "field_name": "properties.end_datetime",
+            "values": [{"from": "1850-01-01", "to": "*"}],
+        },
+    ]
+
+
+def test_apply_datetime_filter_fully_open_adds_no_filters():
+    search = globus_sdk.SearchQuery()
+
+    DatabaseLogic.apply_datetime_filter(search, "/")
+
+    assert search.get("filters", []) == []

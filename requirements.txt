@@ -1,5 +1,5 @@
 attrs==25.3.0
-esgvoc==4.0.0
+esgvoc==6.1.0
 fastapi>=0.109.0
 globus_sdk==3.62.0
 hishel==1.2.1

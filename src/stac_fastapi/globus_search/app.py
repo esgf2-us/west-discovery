@@ -3,8 +3,7 @@ This app definition is a fork of the one from the Mongo backend for
 stac-fastapi.
 """
 
-import os
-
+from fastapi import Depends, Header
 from hishel import AsyncSqliteStorage
 from hishel.asgi import ASGICacheMiddleware
 from hishel.fastapi import cache
@@ -18,8 +17,8 @@ from stac_fastapi.extensions.core import (
     TokenPaginationExtension,
 )
 from stac_fastapi.extensions.core.free_text import FreeTextConformanceClasses
-from stac_fastapi.sfeos_helpers.filter import EsAsyncBaseFiltersClient
 from stac_fastapi.types.config import ApiSettings
+from starlette.exceptions import HTTPException
 
 from stac_fastapi.globus_search.config import settings
 from stac_fastapi.globus_search.core import GlobusSearchClient
@@ -31,6 +30,20 @@ from stac_fastapi.globus_search.extensions.aggregration import (
 from stac_fastapi.globus_search.extensions.aggregration.client import (
     GlobusSearchAggregationClient,
 )
+from stac_fastapi.globus_search.filter import (
+    GlobusSearchFiltersClient,
+    GlobusFilterExtensionGetRequest,
+    GlobusFilterExtensionPostRequest,
+)
+
+
+async def require_json(content_type: str = Header(..., alias="content-type")):
+    if not content_type.startswith("application/json"):
+        raise HTTPException(
+            status_code=415,
+            detail="Content-Type must be application/json",
+        )
+
 
 database_logic = DatabaseLogic()
 session = Session.create_from_settings(ApiSettings())
@@ -42,8 +55,10 @@ aggregation_extension.POST = GlobusAggregationExtensionPostRequest
 aggregation_extension.GET = GlobusAggregationExtensionGetRequest
 
 filter_extension = FilterExtension(
-    client=EsAsyncBaseFiltersClient(database=database_logic)
+    client=GlobusSearchFiltersClient(database=database_logic)
 )
+filter_extension.GET = GlobusFilterExtensionGetRequest
+filter_extension.POST = GlobusFilterExtensionPostRequest
 filter_extension.conformance_classes.append(
     "http://www.opengis.net/spec/cql2/1.0/conf/advanced-comparison-operators"
 )
@@ -66,7 +81,15 @@ route_dependencies = [
     (
         [{"path": "/collections/{collection_id}/items", "method": "GET"}],
         [cache(max_age=300, public=True)],
-    )
+    ),
+    (
+        [
+            {"path": "/aggregate", "method": "POST"},
+            {"path": "/collections/{collection_id}/aggregate", "method": "POST"},
+            {"path": "/search", "method": "POST"},
+        ],
+        [Depends(require_json)],
+    ),
 ]
 
 api = StacApi(
@@ -81,7 +104,7 @@ api = StacApi(
 )
 handler = ASGICacheMiddleware(
     api.app,
-    storage=AsyncSqliteStorage(database_path=f"/tmp/hishel_cache.db"),
+    storage=AsyncSqliteStorage(database_path="/tmp/hishel_cache.db"),
 )
 
 

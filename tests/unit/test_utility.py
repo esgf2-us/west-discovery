@@ -28,11 +28,13 @@ def test_extract_summaries_from_schema(item_schema):
     assert summaries == {
         "activity_id": ["CMIP", "ScenarioMIP"],
         "frequency": ["mon", "day"],
-        "variant_label": r"^r\d+i\d+p\d+f\d+$",
-        "member_id": [
-            {"pattern": r"^r\d+i\d+p\d+f\d+$"},
-            {"pattern": r"^r\d+i\d+p\d+$"},
-        ],
+        "variant_label": {"type": "string", "pattern": r"^r\d+i\d+p\d+f\d+$"},
+        "member_id": {
+            "anyOf": [
+                {"pattern": r"^r\d+i\d+p\d+f\d+$"},
+                {"pattern": r"^r\d+i\d+p\d+$"},
+            ]
+        },
     }
 
 
@@ -62,7 +64,9 @@ def _project_specs(*, catalog_specs=True, drs_specs=True):
                 parts=[
                     SimpleNamespace(source_collection="activity_id", is_required=True),
                     SimpleNamespace(source_collection="source_id", is_required=False),
-                    SimpleNamespace(source_collection="experiment_id", is_required=True),
+                    SimpleNamespace(
+                        source_collection="experiment_id", is_required=True
+                    ),
                 ],
             )
         }
@@ -106,11 +110,13 @@ def test_get_project_builds_stac_collection(monkeypatch, item_schema):
         "summaries": {
             "activity_id": ["CMIP", "ScenarioMIP"],
             "frequency": ["mon", "day"],
-            "variant_label": r"^r\d+i\d+p\d+f\d+$",
-            "member_id": [
-                {"pattern": r"^r\d+i\d+p\d+f\d+$"},
-                {"pattern": r"^r\d+i\d+p\d+$"},
-            ],
+            "variant_label": {"type": "string", "pattern": r"^r\d+i\d+p\d+f\d+$"},
+            "member_id": {
+                "anyOf": [
+                    {"pattern": r"^r\d+i\d+p\d+f\d+$"},
+                    {"pattern": r"^r\d+i\d+p\d+$"},
+                ]
+            },
         },
         "item_assets": {
             "data": {
@@ -126,8 +132,7 @@ def test_get_project_builds_stac_collection(monkeypatch, item_schema):
                 "href": "https://github.com/WCRP-CMIP/CMIP6_CVs",
                 "type": "text/html",
                 "title": (
-                    "CMIP6 CV \u2014 dataset_id template: "
-                    "{activity_id}.{experiment_id}"
+                    "CMIP6 CV \u2014 dataset_id template: {activity_id}.{experiment_id}"
                 ),
             },
             {
@@ -207,3 +212,66 @@ def test_list_projects_returns_collections_and_skips_invalid_projects(
     assert results == [{"id": "cmip6"}]
     assert token is None
     assert "Skipping 'bad': not configured" in caplog.text
+
+
+def _project_summary_specs(project_id, drs_name, *, has_catalog_specs=True):
+    return SimpleNamespace(
+        project_id=project_id,
+        drs_name=drs_name,
+        catalog_specs=object() if has_catalog_specs else None,
+    )
+
+
+def test_list_project_summaries_returns_id_and_title_for_each_project(monkeypatch):
+    monkeypatch.setattr(utility.ev, "get_all_projects", lambda: ["cmip6", "obs4mips"])
+
+    def fake_get_project(project_id):
+        return {
+            "cmip6": _project_summary_specs("cmip6", "CMIP6"),
+            "obs4mips": _project_summary_specs("obs4mips", "obs4MIPs"),
+        }[project_id]
+
+    monkeypatch.setattr(utility.ev, "get_project", fake_get_project)
+
+    result = utility.list_project_summaries()
+
+    assert result == [
+        {"id": "cmip6", "title": "CMIP6"},
+        {"id": "obs4mips", "title": "obs4MIPs"},
+    ]
+
+
+def test_list_project_summaries_skips_projects_not_found_in_esgvoc(monkeypatch, caplog):
+    monkeypatch.setattr(utility.ev, "get_all_projects", lambda: ["cmip6", "unknown"])
+
+    def fake_get_project(project_id):
+        if project_id == "unknown":
+            return None
+        return _project_summary_specs("cmip6", "CMIP6")
+
+    monkeypatch.setattr(utility.ev, "get_project", fake_get_project)
+
+    result = utility.list_project_summaries()
+
+    assert result == [{"id": "cmip6", "title": "CMIP6"}]
+    assert "Skipping 'unknown': project not found in esgvoc" in caplog.text
+
+
+def test_list_project_summaries_skips_projects_without_catalog_specs(
+    monkeypatch, caplog
+):
+    monkeypatch.setattr(utility.ev, "get_all_projects", lambda: ["cmip6", "incomplete"])
+
+    def fake_get_project(project_id):
+        if project_id == "incomplete":
+            return _project_summary_specs(
+                "incomplete", "Incomplete", has_catalog_specs=False
+            )
+        return _project_summary_specs("cmip6", "CMIP6")
+
+    monkeypatch.setattr(utility.ev, "get_project", fake_get_project)
+
+    result = utility.list_project_summaries()
+
+    assert result == [{"id": "cmip6", "title": "CMIP6"}]
+    assert "Skipping 'incomplete': project has no catalog_specs" in caplog.text

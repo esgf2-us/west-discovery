@@ -1,8 +1,12 @@
 import asyncio
 from types import SimpleNamespace
 
+import globus_sdk
 import pytest
+import requests
+import requests.structures
 from fastapi import HTTPException
+from stac_fastapi.extensions.core import AggregationExtension, FilterExtension
 from starlette.requests import Request
 
 from stac_fastapi.globus_search import core as core_module
@@ -25,6 +29,33 @@ def _request(
             "scheme": scheme,
             "server": (host, 443),
             "client": ("testclient", 50000),
+        }
+    )
+
+
+def _request_with_app(
+    path="/",
+    host="api.example.org",
+    scheme="https",
+    openapi_url="/openapi.json",
+    docs_url="/docs",
+):
+    fake_app = SimpleNamespace(
+        state=SimpleNamespace(router_prefix=""),
+        openapi_url=openapi_url,
+        docs_url=docs_url,
+    )
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": path,
+            "headers": [(b"host", host.encode())],
+            "query_string": b"",
+            "scheme": scheme,
+            "server": (host, 443),
+            "client": ("testclient", 50000),
+            "app": fake_app,
         }
     )
 
@@ -80,8 +111,11 @@ class FakeDatabase:
         return self.items, self.total, self.next_marker
 
 
-def _client(database=None):
-    return GlobusSearchClient(database=database or FakeDatabase())
+def _client(database=None, extensions=None):
+    return GlobusSearchClient(
+        database=database or FakeDatabase(),
+        extensions=extensions or [],
+    )
 
 
 @pytest.mark.parametrize(
@@ -153,8 +187,8 @@ def test_item_collection_applies_collection_filter_and_query_token():
     assert execute_call[1]["collection_ids"] == ["CMIP6"]
     assert item_collection["type"] == "FeatureCollection"
     assert item_collection["features"] == [{"id": "item-1", "links": []}]
-    assert item_collection["numReturned"] == 1
-    assert item_collection["numMatched"] == 12
+    assert item_collection["numberReturned"] == 1
+    assert item_collection["numberMatched"] == 12
     assert item_collection["context"] == {"matched": 12}
     assert item_collection["links"][0]["rel"] == "next"
 
@@ -233,7 +267,6 @@ def test_post_search_applies_request_filters_and_pagination():
     database.total = 7
     database.next_marker = "next-page"
     client = _client(database)
-    client._return_date = lambda value: f"parsed:{value}"
     search_request = SimpleNamespace(
         ids=["item-1"],
         collections=["CMIP6"],
@@ -254,7 +287,7 @@ def test_post_search_applies_request_filters_and_pagination():
     assert ("apply_collections_filter", ["CMIP6"]) in database.calls
     assert (
         "apply_datetime_filter",
-        "parsed:2025-01-01/2025-12-31",
+        "2025-01-01/2025-12-31",
     ) in database.calls
     assert ("apply_bbox_filter", [-10, -20, 30, 40]) in database.calls
     assert (
@@ -272,7 +305,7 @@ def test_post_search_applies_request_filters_and_pagination():
     assert execute_call[1]["token"] == "page-2"
     assert execute_call[1]["collection_ids"] == ["CMIP6"]
     assert item_collection["features"] == [{"id": "item-1"}]
-    assert item_collection["numMatched"] == 7
+    assert item_collection["numberMatched"] == 7
     assert item_collection["links"][0]["rel"] == "next"
     assert search_request.query is None
     assert search_request.sortby is None
@@ -350,7 +383,32 @@ def test_post_search_wraps_cql2_filter_errors_in_http_400():
         )
 
     assert exc_info.value.status_code == 400
-    assert exc_info.value.detail == "Error with cql2_json filter: bad cql"
+    assert exc_info.value.detail == "Malformed CQL2 filter: bad cql"
+
+
+def test_post_search_wraps_cql2_not_implemented_in_http_501():
+    class BadFilterDatabase(FakeDatabase):
+        def apply_cql2_filter(self, search, filter_):
+            raise NotImplementedError("not supported")
+
+    search_request = SimpleNamespace(
+        ids=None,
+        collections=None,
+        datetime=None,
+        bbox=None,
+        intersects=None,
+        filter_expr={"op": "t_after"},
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            _client(BadFilterDatabase()).post_search(
+                search_request, _request(path="/search")
+            )
+        )
+
+    assert exc_info.value.status_code == 501
+    assert exc_info.value.detail == "not supported"
 
 
 def test_post_search_wraps_free_text_errors_in_http_400():
@@ -376,3 +434,187 @@ def test_post_search_wraps_free_text_errors_in_http_400():
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Error with free-text query: bad q"
+
+
+def test_get_collection_raises_404_when_project_not_found(monkeypatch):
+    async def fake_get_collection(self, collection_id, **kwargs):
+        raise ValueError("unknown project")
+
+    monkeypatch.setattr(core_module.CoreClient, "get_collection", fake_get_collection)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(_client().get_collection("UNKNOWN", request=_request()))
+
+    assert exc_info.value.status_code == 404
+    assert "unknown project" in exc_info.value.detail
+
+
+def test_get_item_raises_404_when_item_not_found(monkeypatch):
+    async def fake_get_item(self, item_id, collection_id, **kwargs):
+        raise _make_search_api_error(404)
+
+    monkeypatch.setattr(core_module.CoreClient, "get_item", fake_get_item)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(_client().get_item("missing-item", "CMIP6", request=_request()))
+
+    assert exc_info.value.status_code == 404
+    assert "missing-item" in exc_info.value.detail
+
+
+def test_get_item_reraises_non_404_search_api_errors(monkeypatch):
+    async def fake_get_item(self, item_id, collection_id, **kwargs):
+        raise _make_search_api_error(500)
+
+    monkeypatch.setattr(core_module.CoreClient, "get_item", fake_get_item)
+
+    with pytest.raises(globus_sdk.SearchAPIError):
+        asyncio.run(_client().get_item("item-1", "CMIP6", request=_request()))
+
+
+def _make_search_api_error(status_code):
+    resp = requests.models.Response()
+    resp.status_code = status_code
+    resp._content = b"{}"
+    resp.encoding = "utf-8"
+    req = requests.models.PreparedRequest()
+    req.method = "GET"
+    req.url = "https://example.com"
+    req.headers = requests.structures.CaseInsensitiveDict()
+    resp.request = req
+    return globus_sdk.SearchAPIError(resp)
+
+
+class SearchAPIErrorDatabase(FakeDatabase):
+    def __init__(self, status_code):
+        super().__init__()
+        self._status_code = status_code
+
+    async def execute_search(self, **kwargs):
+        raise _make_search_api_error(self._status_code)
+
+
+@pytest.mark.parametrize(
+    ("api_status", "expected_status"),
+    [
+        (400, 400),
+        (404, 404),
+        (401, 401),
+        (403, 403),
+    ],
+)
+def test_item_collection_maps_search_api_error_to_http(api_status, expected_status):
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            _client(SearchAPIErrorDatabase(api_status)).item_collection(
+                "CMIP6",
+                request=_request(path="/collections/CMIP6/items"),
+            )
+        )
+
+    assert exc_info.value.status_code == expected_status
+
+
+def test_item_collection_raises_502_for_other_search_api_errors():
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(
+            _client(SearchAPIErrorDatabase(500)).item_collection(
+                "CMIP6",
+                request=_request(path="/collections/CMIP6/items"),
+            )
+        )
+
+    assert exc_info.value.status_code == 502
+    assert "Upstream search error" in exc_info.value.detail
+
+
+def test_landing_page_includes_service_links(monkeypatch):
+    monkeypatch.setattr(core_module, "list_project_summaries", lambda: [])
+
+    page = asyncio.run(_client().landing_page(request=_request_with_app()))
+
+    service_desc = next(link for link in page["links"] if link["rel"] == "service-desc")
+    assert service_desc["href"] == "https://api.example.org/openapi.json"
+    service_doc = next(link for link in page["links"] if link["rel"] == "service-doc")
+    assert service_doc["href"] == "https://api.example.org/docs"
+
+
+def test_landing_page_adds_child_link_for_each_project(monkeypatch):
+    monkeypatch.setattr(
+        core_module,
+        "list_project_summaries",
+        lambda: [
+            {"id": "cmip6", "title": "CMIP6"},
+            {"id": "obs4mips", "title": "obs4MIPs"},
+        ],
+    )
+
+    page = asyncio.run(_client().landing_page(request=_request_with_app()))
+
+    child_links = [link for link in page["links"] if link["rel"] == "child"]
+    assert len(child_links) == 2
+    assert child_links[0]["href"] == "https://api.example.org/collections/cmip6"
+    assert child_links[0]["title"] == "CMIP6"
+    assert child_links[1]["href"] == "https://api.example.org/collections/obs4mips"
+    assert child_links[1]["title"] == "obs4MIPs"
+
+
+def test_landing_page_uses_project_id_as_title_when_title_is_absent(monkeypatch):
+    monkeypatch.setattr(
+        core_module, "list_project_summaries", lambda: [{"id": "cmip6"}]
+    )
+
+    page = asyncio.run(_client().landing_page(request=_request_with_app()))
+
+    child_link = next(link for link in page["links"] if link["rel"] == "child")
+    assert child_link["title"] == "cmip6"
+
+
+def test_landing_page_adds_queryables_link_when_filter_extension_is_enabled(
+    monkeypatch,
+):
+    monkeypatch.setattr(core_module, "list_project_summaries", lambda: [])
+
+    page = asyncio.run(
+        _client(extensions=[FilterExtension()]).landing_page(
+            request=_request_with_app()
+        )
+    )
+
+    queryables_links = [link for link in page["links"] if link["rel"] == "queryables"]
+    assert len(queryables_links) == 1
+    assert queryables_links[0]["href"] == "https://api.example.org/queryables"
+
+
+def test_landing_page_omits_queryables_link_without_filter_extension(monkeypatch):
+    monkeypatch.setattr(core_module, "list_project_summaries", lambda: [])
+
+    page = asyncio.run(_client().landing_page(request=_request_with_app()))
+
+    assert not any(link["rel"] == "queryables" for link in page["links"])
+
+
+def test_landing_page_adds_aggregate_links_when_aggregation_extension_is_enabled(
+    monkeypatch,
+):
+    monkeypatch.setattr(core_module, "list_project_summaries", lambda: [])
+
+    page = asyncio.run(
+        _client(extensions=[AggregationExtension()]).landing_page(
+            request=_request_with_app()
+        )
+    )
+
+    aggregate = next(link for link in page["links"] if link["rel"] == "aggregate")
+    assert aggregate["href"] == "https://api.example.org/aggregate"
+    aggregations = next(link for link in page["links"] if link["rel"] == "aggregations")
+    assert aggregations["href"] == "https://api.example.org/aggregations"
+
+
+def test_landing_page_omits_aggregate_links_without_aggregation_extension(monkeypatch):
+    monkeypatch.setattr(core_module, "list_project_summaries", lambda: [])
+
+    page = asyncio.run(_client().landing_page(request=_request_with_app()))
+
+    assert not any(link["rel"] == "aggregate" for link in page["links"])
+    assert not any(link["rel"] == "aggregations" for link in page["links"])

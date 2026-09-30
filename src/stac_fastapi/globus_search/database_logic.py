@@ -7,34 +7,20 @@ import typing as t
 
 import attrs
 import globus_sdk
-from fastapi import HTTPException
 from stac_fastapi.core import serializers
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 
 from .config import settings
 from .convert import search_doc_to_stac_item
-from .utility import get_project, list_projects
+from .utility import (
+    collection_property_keys,
+    get_project,
+    list_projects,
+    project_namespace,
+)
 
 _client = settings.search_client
-
-
-def _collection_property_prefix(collection_ids: list[str] | None) -> str | None:
-    if not collection_ids or len(collection_ids) != 1:
-        return None
-    return collection_ids[0].lower()
-
-
-def cql_translate_fieldname(
-    fieldname: str, collection_ids: list[str] | None = None
-) -> str:
-    if fieldname in ("id", "collection", "geometry"):
-        return fieldname
-    if ":" in fieldname:
-        return f"properties.{fieldname}"
-    if collection_prefix := _collection_property_prefix(collection_ids):
-        return f"properties.{collection_prefix}:{fieldname}"
-    return f"properties.{fieldname}"
 
 
 def cql_like_to_globus_like(pattern: str) -> str:
@@ -58,6 +44,89 @@ def cql_like_to_globus_like(pattern: str) -> str:
         raise ValueError("CQL LIKE pattern cannot end with an escape character")
 
     return "".join(out)
+
+
+def _collection_property_prefix(collection_ids: list[str] | None) -> str | None:
+    """Return the single collection's property namespace, or None if not exactly one.
+
+    Used to namespace bare facet names to their per-collection index field
+    ("properties.<namespace>:<facet>") on both the CQL2 filter path
+    (``cql_translate_fieldname``) and the aggregation extension. A bare property
+    can only be resolved against exactly one collection, so zero or multiple
+    collections return None (callers raise a helpful error).
+
+    The namespace is usually the collection's lowercased id, but some
+    collections alias another project's vocabulary (e.g. CMIP6Test -> cmip6);
+    ``project_namespace`` resolves those so facets/filters target the real
+    indexed field ("properties.cmip6:...") rather than a namespace that holds
+    no data. The alias affects only the property namespace — collection
+    filtering still uses the real collection id.
+    """
+    if not collection_ids or len(collection_ids) != 1:
+        return None
+    return project_namespace(collection_ids[0])
+
+
+# CQL2 properties whose index field does not live under "properties.". For
+# example, replica host names are stored at "assets.alternate:name", not
+# "properties.alternate:name".
+_CQL_FIELD_OVERRIDES = {
+    "alternate:name": "assets.alternate:name",
+}
+
+
+def cql_translate_fieldname(
+    fieldname: str, collection_ids: list[str] | None = None
+) -> str:
+    """Resolve a CQL2 property name to its Globus Search index field.
+
+    Both the bare and qualified forms of a property are accepted:
+
+    - ``id`` / ``collection`` / ``geometry`` and ``_CQL_FIELD_OVERRIDES`` map to
+      their fixed index fields.
+    - A name already starting with ``properties.`` passes through unchanged, and
+      an explicitly project-prefixed name (e.g. ``cmip6:activity_id``) is simply
+      qualified to ``properties.cmip6:activity_id``.
+    - A **bare** name is resolved against the single scoped collection's real
+      property keys (from esgvoc): if it exists bare it is a common field and
+      becomes ``properties.<name>`` (e.g. ``retracted``); otherwise, if the
+      ``<collection>:<name>`` key exists it is a facet and becomes
+      ``properties.<collection>:<name>`` (so ``activity_id`` ==
+      ``cmip6:activity_id``). An unknown bare name falls back to
+      ``properties.<name>``.
+
+    A bare name cannot be resolved without exactly one collection to determine
+    its namespace, so zero or multiple collections raise ``ValueError``.
+    """
+    if fieldname in ("id", "collection", "geometry"):
+        return fieldname
+    if fieldname in _CQL_FIELD_OVERRIDES:
+        return _CQL_FIELD_OVERRIDES[fieldname]
+    # Already-qualified names pass through unchanged (idempotent).
+    if fieldname.startswith("properties."):
+        return fieldname
+    # Explicitly project-prefixed facet, e.g. "cmip6:activity_id".
+    if ":" in fieldname:
+        return f"properties.{fieldname}"
+    # Bare name: needs exactly one collection to resolve its namespace.
+    collection_prefix = _collection_property_prefix(collection_ids)
+    if collection_prefix is None:
+        count = len(collection_ids) if collection_ids else 0
+        raise ValueError(
+            f"cannot resolve bare property '{fieldname}': it requires exactly one "
+            f"collection to determine its namespace "
+            f"(got {count}). Specify a single collection, or use a qualified form "
+            f"such as 'properties.{fieldname}' or '<collection>:{fieldname}'."
+        )
+    # esgvoc names facets project-prefixed (cmip6:activity_id) and common fields
+    # bare (retracted). Match the bare form first (common field), then the
+    # collection-prefixed form (facet); fall back to un-prefixed for unknowns.
+    keys = collection_property_keys(collection_prefix)
+    if fieldname in keys:
+        return f"properties.{fieldname}"
+    if f"{collection_prefix}:{fieldname}" in keys:
+        return f"properties.{collection_prefix}:{fieldname}"
+    return f"properties.{fieldname}"
 
 
 def _extract_collection_ids(search: globus_sdk.SearchQuery) -> list[str] | None:
@@ -88,7 +157,7 @@ def cql_to_filter(
       https://docs.ogc.org/DRAFTS/21-065.html#temporal-functions
     """
     if "op" not in cql_query:
-        return {}
+        raise ValueError("CQL2 filter must include an 'op' field")
     cql_op = cql_query["op"]
 
     # each group of matches is marked with one of the following qualifiers:
@@ -132,26 +201,32 @@ def cql_to_filter(
             #
             # We have made the single arg assumption for several of these
             # without checks that it is true.
-            assert len(cql_query["args"]) == 2
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
+            if len(cql_query["args"]) != 2:
+                raise ValueError(
+                    f"'=' filter requires exactly 2 arguments, got {len(cql_query['args'])}"
+                )
+
             return {
                 "type": "match_any",
-                "field_name": fieldname,
+                "field_name": cql_translate_fieldname(
+                    cql_query["args"][0]["property"], collection_ids=collection_ids
+                ),
                 "values": [cql_query["args"][1]],
             }
         case "<>":
             # 'not match_all', see comments in '=' above
-            assert len(cql_query["args"]) == 2
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
+            if len(cql_query["args"]) != 2:
+                raise ValueError(
+                    f"'<>' filter requires exactly 2 arguments, got {len(cql_query['args'])}"
+                )
+
             return {
                 "type": "not",
                 "filter": {
                     "type": "match_any",
-                    "field_name": fieldname,
+                    "field_name": cql_translate_fieldname(
+                        cql_query["args"][0]["property"], collection_ids=collection_ids
+                    ),
                     "values": [cql_query["args"][1]],
                 },
             }
@@ -159,40 +234,41 @@ def cql_to_filter(
             # we only have '<=' and '>=' in Search today
             raise NotImplementedError("'>' and '<' filters are not supported yet")
         case "isNull":
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
             # isNull => not(exists)
             return {
                 "type": "not",
-                "filter": {"type": "exists", "field_name": fieldname},
+                "filter": {
+                    "type": "exists",
+                    "field_name": cql_translate_fieldname(
+                        cql_query["args"][0]["property"], collection_ids=collection_ids
+                    ),
+                },
             }
         case "<=":
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
             value = cql_query["args"][1]
             return {
                 "type": "range",
-                "field_name": fieldname,
+                "field_name": cql_translate_fieldname(
+                    cql_query["args"][0]["property"], collection_ids=collection_ids
+                ),
                 "values": [{"from": "*", "to": value}],
             }
         case ">=":
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
             value = cql_query["args"][1]
             return {
                 "type": "range",
-                "field_name": fieldname,
+                "field_name": cql_translate_fieldname(
+                    cql_query["args"][0]["property"], collection_ids=collection_ids
+                ),
                 "values": [{"from": value, "to": "*"}],
             }
         # ADVANCED COMPARISON OPERATORS (???)
         case "like":
-            assert len(cql_query["args"]) == 2
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
+            if len(cql_query["args"]) != 2:
+                raise ValueError(
+                    f"'like' filter requires exactly 2 arguments, got {len(cql_query['args'])}"
+                )
+
             value = cql_query["args"][1]
 
             if not isinstance(value, str):
@@ -200,31 +276,31 @@ def cql_to_filter(
 
             return {
                 "type": "like",
-                "field_name": fieldname,
+                "field_name": cql_translate_fieldname(
+                    cql_query["args"][0]["property"], collection_ids=collection_ids
+                ),
                 "value": cql_like_to_globus_like(value),
             }
         case "between":
             # range filter should work
             raise NotImplementedError("'between' filter is not supported yet")
         case "in":
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
             return {
                 "type": "match_any",
-                "field_name": fieldname,
+                "field_name": cql_translate_fieldname(
+                    cql_query["args"][0]["property"], collection_ids=collection_ids
+                ),
                 "values": cql_query["args"][1],
             }
         # SPATIAL OPERATORS (partial)
         # note that this divides in the filter spec between "Basic Spatial Operators"
         # and "Spatial Operators"
         case "s_intersects" | "s_within":
-            fieldname = cql_translate_fieldname(
-                cql_query["args"][0]["property"], collection_ids=collection_ids
-            )
             return {
                 "type": "geo_shape",
-                "field_name": fieldname,
+                "field_name": cql_translate_fieldname(
+                    cql_query["args"][0]["property"], collection_ids=collection_ids
+                ),
                 "relation": cql_op[2:],
                 "shape": cql_query["args"][1],
             }
@@ -305,6 +381,42 @@ def cql_to_filter(
     return cql_op
 
 
+# Fields holding the item's temporal extent. CMIP6 items are ranges:
+# ``properties.datetime`` is null while ``start_datetime``/``end_datetime`` are set.
+_START_DATETIME_FIELD = "properties.start_datetime"
+_END_DATETIME_FIELD = "properties.end_datetime"
+
+
+def parse_datetime_interval(
+    datetime_search: t.Any,
+) -> tuple[str | None, str | None]:
+    """Parse a STAC ``datetime`` parameter into a ``(start, end)`` pair.
+
+    Accepts a single RFC 3339 instant (``"2020-01-01T00:00:00Z"``) or an
+    interval (``"start/end"``). Open-ended bounds — expressed as ``".."`` or an
+    empty component — become ``None``. A single instant is returned as
+    ``(value, value)``.
+    """
+    if datetime_search is None:
+        return None, None
+
+    text = datetime_search if isinstance(datetime_search, str) else str(datetime_search)
+    text = text.strip()
+
+    if "/" in text:
+        start_str, _, end_str = text.partition("/")
+    else:
+        start_str = end_str = text
+
+    def _norm(component: str) -> str | None:
+        component = component.strip()
+        if component in ("", ".."):
+            return None
+        return component
+
+    return _norm(start_str), _norm(end_str)
+
+
 @attrs.define
 class DatabaseLogic:
     item_serializer: type[serializers.ItemSerializer] = attrs.field(
@@ -349,6 +461,39 @@ class DatabaseLogic:
         search: globus_sdk.SearchQuery, shape: dict[str, t.Any]
     ):
         # search.add_filter(...)
+        return search
+
+    @staticmethod
+    def apply_datetime_filter(search: globus_sdk.SearchQuery, datetime_search: t.Any):
+        """Filter items whose temporal extent intersects the query interval.
+
+        Items store their extent as ``properties.start_datetime`` /
+        ``properties.end_datetime``. An item intersects the query interval
+        ``[start, end]`` when ``start_datetime <= end`` and
+        ``end_datetime >= start``. Each bound is applied only when present, so
+        open-ended and single-instant queries are handled naturally.
+        """
+        start, end = parse_datetime_interval(datetime_search)
+        if start is None and end is None:
+            return search
+
+        search["filters"] = search.get("filters", [])
+        if end is not None:
+            search["filters"].append(
+                {
+                    "type": "range",
+                    "field_name": _START_DATETIME_FIELD,
+                    "values": [{"from": "*", "to": end}],
+                }
+            )
+        if start is not None:
+            search["filters"].append(
+                {
+                    "type": "range",
+                    "field_name": _END_DATETIME_FIELD,
+                    "values": [{"from": start, "to": "*"}],
+                }
+            )
         return search
 
     @staticmethod
@@ -418,14 +563,9 @@ class DatabaseLogic:
 
         if token:
             search.set_marker(token)
-        try:
-            response = await run_in_threadpool(
-                _client.scroll, settings.search_index_id, search
-            )
-        except globus_sdk.SearchAPIError as e:
-            print("SearchAPIError:")
-            print(e.text)
-            raise
+        response = await run_in_threadpool(
+            _client.scroll, settings.search_index_id, search
+        )
         return (
             [search_doc_to_stac_item(doc) for doc in response["gmeta"]],
             response["total"],

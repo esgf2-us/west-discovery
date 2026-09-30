@@ -2,7 +2,6 @@ import os
 
 import pytest
 
-
 os.environ.setdefault("SEARCH_INDEX_ID", "test-search-index")
 
 

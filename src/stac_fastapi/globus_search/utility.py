@@ -6,8 +6,56 @@ from functools import lru_cache
 import esgvoc.api.projects as ev
 from esgvoc.api.project_specs import DrsType
 from esgvoc.apps.jsg.json_schema_generator import generate_json_schema
+from stac_fastapi.core.extensions.filter import DEFAULT_QUERYABLES
 
 logger = logging.getLogger(__name__)
+
+
+# Collections whose indexed property namespace differs from their id. CMIP6Test
+# reuses the cmip6 project vocabulary in esgvoc 4.0.0, so its items are indexed
+# under "properties.cmip6:...". This is a temporary alias tied to that esgvoc
+# version and should be revisited when the CV changes. Single source of truth
+# for both collection-document building (_build_project) and field-namespace
+# resolution (database_logic._collection_property_prefix).
+COLLECTION_NAMESPACE_ALIASES = {"cmip6test": "cmip6"}
+
+
+def project_namespace(collection_id: str) -> str:
+    """Map a collection id to the project namespace its properties use.
+
+    Most collections use their own lowercased id as the property namespace
+    (e.g. "CMIP6" -> "cmip6"). A few are aliases for another project's
+    vocabulary (see COLLECTION_NAMESPACE_ALIASES) and resolve to that project's
+    namespace instead (e.g. "CMIP6Test" -> "cmip6").
+    """
+    key = collection_id.lower()
+    return COLLECTION_NAMESPACE_ALIASES.get(key, key)
+
+
+@lru_cache(maxsize=None)
+def collection_property_keys(project_id: str) -> frozenset[str]:
+    """Return the item property keys for a project, exactly as esgvoc names them.
+
+    These are the keys as stored under the item's ``properties`` object: CV/DRS
+    facets are project-prefixed (e.g. ``cmip6:activity_id``) while common fields
+    are bare (e.g. ``retracted``, ``latest``). The CQL2 filter path uses this set
+    to resolve a user-supplied bare name to the real index field — matching it
+    directly (common field) or under the ``<collection>:`` prefix (facet).
+    Common STAC fields (``DEFAULT_QUERYABLES``) are excluded. Returns an empty
+    set for unknown projects or if the esgvoc lookup fails.
+    """
+    pid = project_id.lower()
+    try:
+        if ev.get_project(pid) is None:
+            return frozenset()
+        schema = generate_json_schema(pid)
+        item_properties = (
+            schema.get("definitions", {}).get("item_fields", {}).get("properties", {})
+        )
+        return frozenset(k for k in item_properties if k not in DEFAULT_QUERYABLES)
+    except Exception:
+        logger.warning("Failed to load esgvoc properties for project '%s'", project_id)
+        return frozenset()
 
 
 def _extract_summaries_from_schema(schema: dict) -> dict:
@@ -42,10 +90,13 @@ def _extract_summaries_from_schema(schema: dict) -> dict:
         if "enum" in inner:
             summaries[field_name] = inner["enum"]
         elif "pattern" in inner:
-            summaries[field_name] = inner["pattern"]
+            # STAC summaries can't be bare strings; wrap the regex as a JSON
+            # Schema object (the "JSON Schema" summary form).
+            summaries[field_name] = {"type": "string", "pattern": inner["pattern"]}
         elif "anyOf" in inner:
-            # Composite terms expressed as a union of patterns
-            summaries[field_name] = inner["anyOf"]
+            # Composite terms expressed as a union of patterns. Wrap as a JSON
+            # Schema object so the summary is a schema, not a bare list.
+            summaries[field_name] = {"anyOf": inner["anyOf"]}
         # else: source_collection was null → only "type" present → skip
 
     return summaries
@@ -61,6 +112,8 @@ def _build_project(project_id: str = "cmip6") -> dict:
     Compatible with esgvoc >= 4.0.0.
     """
     # ── 1. Project-level metadata ─────────────────────────────────────────────
+    # Resolve collection→project aliases (e.g. CMIP6Test -> cmip6) centrally.
+    project_id = project_namespace(project_id)
     specs = ev.get_project(project_id.lower())
     if specs is None:
         raise ValueError(f"Project '{project_id}' not found in esgvoc")
@@ -91,7 +144,7 @@ def _build_project(project_id: str = "cmip6") -> dict:
         links.append(
             {
                 "rel": "describedby",
-                "href": f"https://github.com/WCRP-CMIP/CMIP6_CVs",
+                "href": "https://github.com/WCRP-CMIP/CMIP6_CVs",
                 "type": "text/html",
                 "title": f"{drs_name} CV — dataset_id template: {template}",
             }
@@ -167,9 +220,7 @@ def _build_project_summaries() -> list[dict[str, str]]:
             logger.warning("Skipping '%s': project not found in esgvoc", project_id)
             continue
         if specs.catalog_specs is None:
-            logger.warning(
-                "Skipping '%s': project has no catalog_specs", project_id
-            )
+            logger.warning("Skipping '%s': project has no catalog_specs", project_id)
             continue
 
         results.append({"id": specs.project_id, "title": specs.drs_name})
