@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 # Collections whose indexed property namespace differs from their id. CMIP6Test
-# reuses the cmip6 project vocabulary in esgvoc 4.0.0, so its items are indexed
+# reuses the cmip6 project vocabulary in esgvoc 6.x, so its items are indexed
 # under "properties.cmip6:...". This is a temporary alias tied to that esgvoc
 # version and should be revisited when the CV changes. Single source of truth
 # for both collection-document building (_build_project) and field-namespace
@@ -62,7 +62,7 @@ def _extract_summaries_from_schema(schema: dict) -> dict:
     """
     Extract STAC summaries from the JSON Schema produced by generate_json_schema().
 
-    In 4.0.0 the schema follows a STAC extension pattern where item properties live at:
+    In esgvoc 6.x the schema follows a STAC extension pattern where item properties live at:
         definitions -> item_fields -> properties
 
     The top-level `properties` only contains `stac_extensions` — not what we want.
@@ -109,7 +109,7 @@ def _build_project(project_id: str = "cmip6") -> dict:
     Summaries are derived entirely from generate_json_schema() via catalog_specs —
     no hardcoded field mappings required.
 
-    Compatible with esgvoc >= 4.0.0.
+    Compatible with esgvoc 6.x (developed against esgvoc 6.2.0).
     """
     # ── 1. Project-level metadata ─────────────────────────────────────────────
     # Resolve collection→project aliases (e.g. CMIP6Test -> cmip6) centrally.
@@ -123,7 +123,7 @@ def _build_project(project_id: str = "cmip6") -> dict:
             f"Project '{project_id}' has no catalog_specs — cannot derive summaries"
         )
 
-    # In 4.0.0 ProjectSpecs carries an explicit project_id field
+    # In esgvoc 6.x ProjectSpecs carries an explicit project_id field
     canonical_id = specs.project_id  # e.g. "cmip6"
     drs_name = specs.drs_name  # e.g. "CMIP6"
     cat = specs.catalog_specs.catalog_properties
@@ -165,7 +165,7 @@ def _build_project(project_id: str = "cmip6") -> dict:
         )
 
     # ── 4. item_assets: file-level schema now available via file_properties ───
-    # 4.0.0 exposes catalog_specs.file_properties for asset field constraints.
+    # esgvoc 6.x exposes catalog_specs.file_properties for asset field constraints.
     # We declare a canonical "data" asset here; a full asset schema would be
     # built from file_properties in the same way summaries are from dataset_properties.
     item_assets = {
@@ -194,9 +194,11 @@ def _build_project(project_id: str = "cmip6") -> dict:
         "summaries": summaries,
         "item_assets": item_assets,
         "links": links,
-        # Dataset and base ID regex patterns surfaced from catalog_properties (new in 4.0.0)
+        # Dataset and base ID regex patterns surfaced from catalog_properties.
+        # esgvoc 6.x: regex_id = dataset_id (with version); regex_title =
+        # same id without the version (was regex_base_id in earlier esgvoc).
         "dataset_id_pattern": cat.regex_id,
-        "base_id_pattern": cat.regex_base_id,
+        "base_id_pattern": cat.regex_title,
     }
 
 

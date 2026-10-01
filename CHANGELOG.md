@@ -3,6 +3,23 @@
 All notable changes to this project are documented here.
 This project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] - 2026-10-01
+
+Hot-fix for compatibility with esgvoc 6.2.0.
+
+### Fixed
+- `_build_project` crashed with `AttributeError: 'CatalogProperties' object has
+  no attribute 'regex_base_id'` on `GET /collections/{id}`. esgvoc 6.x renamed
+  `CatalogProperties.regex_base_id` to `regex_title` (same semantics: the
+  dataset id without the version); read `regex_title` for the `base_id_pattern`
+  output.
+
+### Changed
+- Removed leftover debug `print` statements in `_build_project`.
+- Refreshed stale "esgvoc 4.0.0" references in `utility.py` comments and
+  docstrings to reflect esgvoc 6.x.
+- Updated the `utility` unit-test mock to use `regex_title`.
+
 ## [1.0.0] - 2026-09-28
 
 First production release. A STAC API backed by Globus Search, exposing ESGF
@@ -35,4 +52,5 @@ free-text search, and queryables derived from ESGF controlled vocabularies.
 - Unit test coverage expanded to ~95% (200 tests); added error-handling paths;
   queryables tests made independent of the installed esgvoc CV.
 
+[1.0.1]: https://github.com/esgf2-us/west-discovery/releases/tag/v1.0.1
 [1.0.0]: https://github.com/esgf2-us/west-discovery/releases/tag/v1.0.0
