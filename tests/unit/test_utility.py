@@ -51,7 +51,7 @@ def _project_specs(*, catalog_specs=True, drs_specs=True):
                     "{extension_version}/schema.json"
                 ),
                 regex_id=r"^dataset-id$",
-                regex_base_id=r"^base-id$",
+                regex_title=r"^base-id$",
             )
         )
         if catalog_specs
