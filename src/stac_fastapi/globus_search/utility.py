@@ -234,6 +234,32 @@ def list_project_summaries() -> list[dict[str, str]]:
     return deepcopy(_build_project_summaries())
 
 
+# Collections that exist in the index but have no esgvoc project of their own
+# (see COLLECTION_NAMESPACE_ALIASES). Maps lowercased id -> index casing.
+EXTRA_COLLECTION_IDS = {"cmip6test": "CMIP6Test"}
+
+
+@lru_cache(maxsize=1)
+def _collection_id_map() -> dict[str, str]:
+    # esgvoc's project_id is lowercase; drs_name ("title") carries the casing
+    # used by the index's `collection` field (CMIP6, CMIP6Plus, CORDEX-CMIP6...).
+    ids = dict(EXTRA_COLLECTION_IDS)
+    try:
+        for project in _build_project_summaries():
+            ids[project["id"].lower()] = project["title"]
+    except Exception:
+        logger.warning("Failed to build collection id map from esgvoc")
+    return ids
+
+
+def canonical_collection_id(collection_id: str) -> str:
+    """Return the index casing for a collection id, matched case-insensitively.
+
+    Unknown ids pass through unchanged so the index simply returns no matches.
+    """
+    return _collection_id_map().get(collection_id.lower(), collection_id)
+
+
 @lru_cache(maxsize=1)
 def _build_projects() -> list[dict]:
     """

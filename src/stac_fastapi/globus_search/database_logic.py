@@ -14,6 +14,7 @@ from starlette.requests import Request
 from .config import settings
 from .convert import search_doc_to_stac_item
 from .utility import (
+    canonical_collection_id,
     collection_property_keys,
     get_project,
     list_projects,
@@ -453,7 +454,12 @@ class DatabaseLogic:
     def apply_collections_filter(
         search: globus_sdk.SearchQuery, collection_ids: list[str]
     ):
-        search.add_filter("collection", collection_ids, type="match_any")
+        # The index's `collection` field is case-sensitive; accept any casing.
+        search.add_filter(
+            "collection",
+            [canonical_collection_id(c) for c in collection_ids],
+            type="match_any",
+        )
         return search
 
     @staticmethod
