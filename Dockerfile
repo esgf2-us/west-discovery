@@ -1,12 +1,14 @@
 # ==========================================
 # 1. Base Stage: Common dependencies
 # ==========================================
-FROM public.ecr.aws/sam/build-python3.12:latest AS base
+FROM python:3.12-slim AS base
 
 WORKDIR /var/task
 
-# System deps
-RUN dnf install -y openssl && dnf clean all
+# System deps (ca-certificates listed explicitly so it's upgraded to the latest in the repo)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 # Python deps — only re-runs when requirements.txt changes
 COPY ./requirements.txt /var/task/requirements.txt

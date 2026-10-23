@@ -1,4 +1,5 @@
 attrs==25.3.0
+certifi>=2026.10.19
 esgvoc==7.0.0
 fastapi>=0.109.0
 globus_sdk==3.62.0
