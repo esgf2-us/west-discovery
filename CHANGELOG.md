@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+### Fixed
+- `total_count` can now be requested alongside frequency aggregations; the
+  other requested facets are no longer dropped.
+- `GET /aggregate` now applies `filter` / `filter-lang` (CQL2 text or JSON), as
+  `POST` already did. Malformed filters return 400.
+
+### Changed
+- Default frequency aggregation `size` raised from 10 to 100 so
+  high-cardinality facets (e.g. `institution_id`, `source_id`) are not
+  silently truncated.
+
 ## [1.0.2] - 2026-10-29
 
 Collection id casing fix, esgvoc 7.0.0 upgrade, and a base-image/CA-trust

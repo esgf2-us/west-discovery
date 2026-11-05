@@ -1,4 +1,5 @@
 import asyncio
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -617,3 +618,74 @@ def test_aggregate_total_count_combined_with_frequency_aggregation():
         },
         {"name": "total_count", "data_type": "integer", "value": 7},
     ]
+
+
+def test_aggregate_get_applies_cql2_json_filter():
+    database = FakeDatabase()
+    client = _client(database, search_response={"total": 3, "facet_results": []})
+    expr = {"op": "=", "args": [{"property": "variable_id"}, "tas"]}
+
+    asyncio.run(
+        client.aggregate(
+            aggregations=["total_count"],
+            collections=["CMIP7"],
+            filter_expr=json.dumps(expr),
+            filter_lang="cql2-json",
+            request=_request(),
+        )
+    )
+
+    assert ("apply_cql2_filter", expr) in database.calls
+    # Collection filter must come first so facet names resolve.
+    assert database.calls[0][0] == "apply_collections_filter"
+
+
+def test_aggregate_get_applies_cql2_text_filter():
+    database = FakeDatabase()
+    client = _client(database, search_response={"total": 3, "facet_results": []})
+
+    asyncio.run(
+        client.aggregate(
+            aggregations=["total_count"],
+            collections=["CMIP7"],
+            filter_expr="variable_id = 'tas'",
+            filter_lang="cql2-text",
+            request=_request(),
+        )
+    )
+
+    (name, expr) = database.calls[-1]
+    assert name == "apply_cql2_filter"
+    assert expr["op"] == "="
+    assert expr["args"][1] == "tas"
+
+
+def test_aggregate_get_malformed_filter_is_400():
+    client = _client()
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            client.aggregate(
+                aggregations=["total_count"],
+                collections=["CMIP7"],
+                filter_expr="{not json",
+                filter_lang="cql2-json",
+                request=_request(),
+            )
+        )
+    assert exc.value.status_code == 400
+
+
+def test_default_facet_size_is_100():
+    from stac_fastapi.globus_search.extensions.aggregration import aggregration
+
+    assert aggregration.DEFAULT_FACET_SIZE == 100
+    client = _client(search_response={"total": 0, "facet_results": []})
+    asyncio.run(
+        client.aggregate(
+            aggregations=["variable_id_frequency"],
+            collections=["CMIP7"],
+            request=_request(),
+        )
+    )
+    _, search = client.client.calls[0]
+    assert search["facets"][0]["size"] == 100
