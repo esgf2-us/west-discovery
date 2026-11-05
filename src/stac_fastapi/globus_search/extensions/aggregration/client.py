@@ -256,22 +256,13 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
         collection_prefix = _collection_property_prefix(collections)
 
         facet_name_to_aggregation: dict[str, str] = {}
+        want_total_count = False
         for aggregation in aggregations:
             if aggregation == "total_count":
-                response = await run_in_threadpool(
-                    self.client.post_search, settings.search_index_id, search
-                )
-                return {
-                    "type": "AggregationCollection",
-                    "aggregations": [
-                        {
-                            "name": "total_count",
-                            "data_type": "integer",
-                            "value": response["total"],
-                        }
-                    ],
-                    "links": links,
-                }
+                # Not a facet: answered from the same search response's "total"
+                # below, so it can be combined with frequency aggregations.
+                want_total_count = True
+                continue
 
             if aggregation in self.COMMON_AGGREGATIONS:
                 # Non-project-namespaced field (e.g. replica host names).
@@ -304,7 +295,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
             self.client.post_search, settings.search_index_id, search
         )
 
-        if response["facet_results"]:
+        if response.get("facet_results"):
             for facet in response["facet_results"]:
                 stac_buckets = []
                 for bucket in facet["buckets"]:
@@ -320,6 +311,15 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     "buckets": stac_buckets,
                 }
                 stac_aggregations.append(stac_aggregation)
+
+        if want_total_count:
+            stac_aggregations.append(
+                {
+                    "name": "total_count",
+                    "data_type": "integer",
+                    "value": response["total"],
+                }
+            )
 
         return {
             "type": "AggregationCollection",

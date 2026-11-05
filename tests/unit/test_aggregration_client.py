@@ -583,3 +583,37 @@ def test_aggregate_wraps_cql2_filter_not_implemented_in_http_501():
 
     assert exc_info.value.status_code == 501
     assert exc_info.value.detail == "not supported"
+
+
+def test_aggregate_total_count_combined_with_frequency_aggregation():
+    client = _client(
+        search_response={
+            "total": 7,
+            "facet_results": [
+                {
+                    "name": "variable_id",
+                    "buckets": [{"value": "tas", "count": 7}],
+                }
+            ],
+        }
+    )
+
+    result = asyncio.run(
+        client.aggregate(
+            aggregations=["variable_id_frequency", "total_count"],
+            collections=["CMIP7"],
+            request=_request(),
+        )
+    )
+
+    assert len(client.client.calls) == 1
+    assert result["aggregations"] == [
+        {
+            "name": "variable_id_frequency",
+            "data_type": "frequency_distribution",
+            "buckets": [
+                {"key": "tas", "data_type": "frequency_distribution", "frequency": 7}
+            ],
+        },
+        {"name": "total_count", "data_type": "integer", "value": 7},
+    ]
