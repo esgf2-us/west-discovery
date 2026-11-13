@@ -18,6 +18,7 @@ from starlette.exceptions import HTTPException
 from stac_fastapi.globus_search import app
 from stac_fastapi.globus_search.core import GlobusSearchClient
 from stac_fastapi.globus_search.database_logic import DatabaseLogic
+from stac_fastapi.globus_search.logging_config import RequestLoggingMiddleware
 from stac_fastapi.globus_search.extensions.aggregration import (
     GlobusAggregationExtensionGetRequest,
     GlobusAggregationExtensionPostRequest,
@@ -33,8 +34,9 @@ def test_app_wires_database_session_client_and_handler():
     assert isinstance(app.api.client, GlobusSearchClient)
     assert app.api.client.database is app.database_logic
     assert app.api.client.session is app.session
-    assert isinstance(app.handler, ASGICacheMiddleware)
-    assert app.handler.app is app.api.app
+    assert isinstance(app.handler, RequestLoggingMiddleware)
+    assert isinstance(app.handler.app, ASGICacheMiddleware)
+    assert app.handler.app.app is app.api.app
 
 
 def test_app_wires_extensions():

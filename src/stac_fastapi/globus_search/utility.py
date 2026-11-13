@@ -293,4 +293,4 @@ def list_projects() -> tuple[list[dict], None]:
 
 if __name__ == "__main__":
     collection = get_project("cmip6")
-    print(json.dumps(collection, indent=2))
+    print(json.dumps(collection, indent=2))  # CLI debug output, not a log
