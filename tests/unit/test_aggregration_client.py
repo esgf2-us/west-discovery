@@ -654,7 +654,7 @@ def test_aggregate_get_applies_cql2_text_filter():
         )
     )
 
-    (name, expr) = database.calls[-1]
+    name, expr = database.calls[-1]
     assert name == "apply_cql2_filter"
     assert expr["op"] == "="
     assert expr["args"][1] == "tas"

@@ -15,7 +15,6 @@ from stac_fastapi.extensions.core.filter.request import (
 )
 from typing_extensions import Annotated
 
-
 # Default number of buckets returned per frequency aggregation. The upstream
 # default of 10 silently truncates high-cardinality facets such as
 # institution_id or source_id.
