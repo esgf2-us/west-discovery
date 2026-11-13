@@ -678,7 +678,7 @@ def test_aggregate_get_malformed_filter_is_400():
 def test_default_facet_size_is_100():
     from stac_fastapi.globus_search.extensions.aggregration import aggregration
 
-    assert aggregration.DEFAULT_FACET_SIZE == 100
+    assert aggregration.DEFAULT_FACET_SIZE == 2000
     client = _client(search_response={"total": 0, "facet_results": []})
     asyncio.run(
         client.aggregate(

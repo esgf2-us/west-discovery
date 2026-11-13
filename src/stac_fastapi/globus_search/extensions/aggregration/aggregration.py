@@ -19,7 +19,7 @@ from typing_extensions import Annotated
 # Default number of buckets returned per frequency aggregation. The upstream
 # default of 10 silently truncates high-cardinality facets such as
 # institution_id or source_id.
-DEFAULT_FACET_SIZE = 100
+DEFAULT_FACET_SIZE = 2000
 
 
 @attr.s
