@@ -6,21 +6,27 @@ faceting capabilities, replacing ElasticSearch-based aggregations.
 """
 
 from typing import Any, Optional
-from urllib.parse import urljoin
+from urllib.parse import unquote_plus, urljoin
 
 import attrs
 import globus_sdk
+import orjson
 from fastapi import HTTPException
 from stac_fastapi.core.base_database_logic import BaseDatabaseLogic
 from stac_fastapi.core.extensions.aggregation import EsAggregationExtensionPostRequest
 from stac_fastapi.core.session import Session
 from stac_fastapi.extensions.core.aggregation.client import BaseAggregationClient
 from stac_fastapi.extensions.core.aggregation.types import AggregationCollection
+from pygeofilter.backends.cql2_json import to_cql2
+from pygeofilter.parsers.cql2_text import parse as parse_cql2_text
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 
 from stac_fastapi.globus_search.config import settings
 from stac_fastapi.globus_search.database_logic import _collection_property_prefix
+from stac_fastapi.globus_search.extensions.aggregration.aggregration import (
+    DEFAULT_FACET_SIZE,
+)
 
 
 @attrs.define
@@ -167,7 +173,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
         collection_id: Optional[str] = None,
         filter_expr: Optional[str] = None,
         filter_lang: Optional[str] = None,
-        size: Optional[int] = 10,
+        size: Optional[int] = DEFAULT_FACET_SIZE,
         **kwargs,
     ) -> dict[str, Any]:
         request: Request = kwargs.get("request")
@@ -204,11 +210,26 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
         # cql_translate_fieldname). Applying it earlier — before
         # apply_collections_filter — leaves the collection invisible to the
         # translation and fails with "require exactly one collection".
-        if aggregate_request and aggregate_request.filter_expr:
+        cql_filter = None
+        if aggregate_request:
+            cql_filter = aggregate_request.filter_expr
+        elif filter_expr:
+            # GET: the filter arrives as a raw string. Parse it the same way
+            # core.get_search does for GET /search.
             try:
-                search = self.database.apply_cql2_filter(
-                    search, aggregate_request.filter_expr
+                cql_filter = (
+                    orjson.loads(unquote_plus(filter_expr))
+                    if filter_lang == "cql2-json"
+                    else orjson.loads(to_cql2(parse_cql2_text(filter_expr)))
                 )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400, detail=f"Malformed CQL2 filter: {e}"
+                )
+
+        if cql_filter:
+            try:
+                search = self.database.apply_cql2_filter(search, cql_filter)
             except NotImplementedError as e:
                 raise HTTPException(status_code=501, detail=str(e))
             except (ValueError, KeyError, IndexError) as e:
@@ -256,22 +277,13 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
         collection_prefix = _collection_property_prefix(collections)
 
         facet_name_to_aggregation: dict[str, str] = {}
+        want_total_count = False
         for aggregation in aggregations:
             if aggregation == "total_count":
-                response = await run_in_threadpool(
-                    self.client.post_search, settings.search_index_id, search
-                )
-                return {
-                    "type": "AggregationCollection",
-                    "aggregations": [
-                        {
-                            "name": "total_count",
-                            "data_type": "integer",
-                            "value": response["total"],
-                        }
-                    ],
-                    "links": links,
-                }
+                # Not a facet: answered from the same search response's "total"
+                # below, so it can be combined with frequency aggregations.
+                want_total_count = True
+                continue
 
             if aggregation in self.COMMON_AGGREGATIONS:
                 # Non-project-namespaced field (e.g. replica host names).
@@ -304,7 +316,7 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
             self.client.post_search, settings.search_index_id, search
         )
 
-        if response["facet_results"]:
+        if response.get("facet_results"):
             for facet in response["facet_results"]:
                 stac_buckets = []
                 for bucket in facet["buckets"]:
@@ -320,6 +332,15 @@ class GlobusSearchAggregationClient(BaseAggregationClient):
                     "buckets": stac_buckets,
                 }
                 stac_aggregations.append(stac_aggregation)
+
+        if want_total_count:
+            stac_aggregations.append(
+                {
+                    "name": "total_count",
+                    "data_type": "integer",
+                    "value": response["total"],
+                }
+            )
 
         return {
             "type": "AggregationCollection",
