@@ -675,7 +675,7 @@ def test_aggregate_get_malformed_filter_is_400():
     assert exc.value.status_code == 400
 
 
-def test_default_facet_size_is_100():
+def test_default_facet_size_is_2000():
     from stac_fastapi.globus_search.extensions.aggregration import aggregration
 
     assert aggregration.DEFAULT_FACET_SIZE == 2000
@@ -688,4 +688,4 @@ def test_default_facet_size_is_100():
         )
     )
     _, search = client.client.calls[0]
-    assert search["facets"][0]["size"] == 100
+    assert search["facets"][0]["size"] == 2000
