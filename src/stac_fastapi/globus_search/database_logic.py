@@ -3,6 +3,8 @@ This definition is a fork of the one from the Mongo backend for
 stac-fastapi, modified to work on Globus Search.
 """
 
+import logging
+import time
 import typing as t
 
 import attrs
@@ -22,6 +24,7 @@ from .utility import (
 )
 
 _client = settings.search_client
+logger = logging.getLogger(__name__)
 
 
 def cql_like_to_globus_like(pattern: str) -> str:
@@ -569,8 +572,19 @@ class DatabaseLogic:
 
         if token:
             search.set_marker(token)
+        started = time.perf_counter()
         response = await run_in_threadpool(
             _client.scroll, settings.search_index_id, search
+        )
+        logger.debug(
+            "Globus Search scroll completed",
+            extra={
+                "collection_ids": collection_ids,
+                "limit": limit,
+                "paginated": bool(token),
+                "total": response["total"],
+                "globus_duration_ms": round((time.perf_counter() - started) * 1000, 2),
+            },
         )
         return (
             [search_doc_to_stac_item(doc) for doc in response["gmeta"]],

@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 from urllib.parse import urljoin, urlparse
 
@@ -12,6 +13,42 @@ from stac_pydantic.shared import MimeTypes
 from starlette.concurrency import run_in_threadpool
 
 from stac_fastapi.globus_search.utility import list_project_summaries
+
+logger = logging.getLogger(__name__)
+
+
+def _log_search_error(e: globus_sdk.SearchAPIError, operation: str) -> None:
+    """Record the upstream Globus Search error before it is translated."""
+    status = e.http_status
+    logger.log(
+        logging.ERROR if status >= 500 else logging.WARNING,
+        "Globus Search error during %s: %s %s",
+        operation,
+        status,
+        e.message,
+        extra={
+            "operation": operation,
+            "upstream_status": status,
+            "upstream_code": getattr(e, "code", None),
+            "upstream_message": e.message,
+            "upstream_request_id": getattr(e, "request_id", None)
+            or e.headers.get("X-Request-ID"),
+        },
+    )
+
+
+def _raise_for_search_error(e: globus_sdk.SearchAPIError, operation: str):
+    """Log a Globus Search error and raise the matching HTTPException."""
+    _log_search_error(e, operation)
+    if e.http_status == 400:
+        raise HTTPException(status_code=400, detail=e.message)
+    if e.http_status == 404:
+        raise HTTPException(status_code=404, detail="Search index not found")
+    if e.http_status in (401, 403):
+        raise HTTPException(
+            status_code=e.http_status, detail="Access denied to search index"
+        )
+    raise HTTPException(status_code=502, detail=f"Upstream search error: {e.message}")
 
 
 class GlobusSearchClient(CoreClient):
@@ -94,9 +131,14 @@ class GlobusSearchClient(CoreClient):
             )
         except globus_sdk.SearchAPIError as e:
             if e.http_status == 404:
+                logger.info(
+                    "Item not found",
+                    extra={"collection_id": collection_id, "item_id": item_id},
+                )
                 raise HTTPException(
                     status_code=404, detail=f"Item '{item_id}' not found"
                 )
+            _log_search_error(e, "get_item")
             raise
 
     async def get_collection(
@@ -107,6 +149,7 @@ class GlobusSearchClient(CoreClient):
                 collection_id=collection_id, **kwargs
             )
         except ValueError as e:
+            logger.info("Collection not found", extra={"collection_id": collection_id})
             raise HTTPException(status_code=404, detail=str(e))
         # Need to figure out a better way to do this —
         # the collection_id is embedded in the hrefs of
@@ -153,17 +196,7 @@ class GlobusSearchClient(CoreClient):
                 collection_ids=[collection_id],
             )
         except globus_sdk.SearchAPIError as e:
-            if e.http_status == 400:
-                raise HTTPException(status_code=400, detail=e.message)
-            if e.http_status == 404:
-                raise HTTPException(status_code=404, detail="Search index not found")
-            if e.http_status in (401, 403):
-                raise HTTPException(
-                    status_code=e.http_status, detail="Access denied to search index"
-                )
-            raise HTTPException(
-                status_code=502, detail=f"Upstream search error: {e.message}"
-            )
+            _raise_for_search_error(e, "item_collection")
 
         links = await PagingLinks(request=request, next=next_marker).get_links()
 
@@ -231,8 +264,10 @@ class GlobusSearchClient(CoreClient):
             try:
                 search = self.database.apply_cql2_filter(search, cql2_filter)
             except NotImplementedError as e:
+                logger.warning("Unsupported CQL2 filter: %s", e)
                 raise HTTPException(status_code=501, detail=str(e))
             except (ValueError, KeyError, IndexError) as e:
+                logger.warning("Malformed CQL2 filter: %s", e)
                 raise HTTPException(
                     status_code=400, detail=f"Malformed CQL2 filter: {e}"
                 )
@@ -249,6 +284,7 @@ class GlobusSearchClient(CoreClient):
                         search, free_text_queries
                     )
                 except Exception as e:
+                    logger.warning("Free-text query failed: %s", e, exc_info=True)
                     raise HTTPException(
                         status_code=400, detail=f"Error with free-text query: {e}"
                     )
@@ -266,17 +302,7 @@ class GlobusSearchClient(CoreClient):
                 collection_ids=search_request.collections,
             )
         except globus_sdk.SearchAPIError as e:
-            if e.http_status == 400:
-                raise HTTPException(status_code=400, detail=e.message)
-            if e.http_status == 404:
-                raise HTTPException(status_code=404, detail="Search index not found")
-            if e.http_status in (401, 403):
-                raise HTTPException(
-                    status_code=e.http_status, detail="Access denied to search index"
-                )
-            raise HTTPException(
-                status_code=502, detail=f"Upstream search error: {e.message}"
-            )
+            _raise_for_search_error(e, "post_search")
 
         links = await PagingLinks(request=request, next=next_marker).get_links()
 

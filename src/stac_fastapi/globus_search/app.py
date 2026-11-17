@@ -3,6 +3,8 @@ This app definition is a fork of the one from the Mongo backend for
 stac-fastapi.
 """
 
+import logging
+
 from fastapi import Depends, Header
 from hishel import AsyncSqliteStorage
 from hishel.asgi import ASGICacheMiddleware
@@ -35,6 +37,13 @@ from stac_fastapi.globus_search.filter import (
     GlobusFilterExtensionGetRequest,
     GlobusFilterExtensionPostRequest,
 )
+from stac_fastapi.globus_search.logging_config import (
+    RequestLoggingMiddleware,
+    configure_logging,
+)
+
+configure_logging()
+logger = logging.getLogger(__name__)
 
 
 async def require_json(content_type: str = Header(..., alias="content-type")):
@@ -102,9 +111,15 @@ api = StacApi(
     search_get_request_model=create_get_request_model(search_extensions),
     search_post_request_model=post_request_model,
 )
-handler = ASGICacheMiddleware(
-    api.app,
-    storage=AsyncSqliteStorage(database_path="/tmp/hishel_cache.db"),
+# The request logger is outermost so cache hits are logged too.
+handler = RequestLoggingMiddleware(
+    ASGICacheMiddleware(
+        api.app,
+        storage=AsyncSqliteStorage(database_path="/tmp/hishel_cache.db"),
+    )
+)
+logger.info(
+    "Application initialised", extra={"search_index_id": settings.search_index_id}
 )
 
 
@@ -113,8 +128,8 @@ def run() -> None:
     try:
         import uvicorn
 
-        print("host: ", settings.app_host)
-        print("port: ", settings.app_port)
+        logger.info("host: %s", settings.app_host)
+        logger.info("port: %s", settings.app_port)
         uvicorn.run(
             "stac_fastapi.globus_search.app:app",
             host=settings.app_host,

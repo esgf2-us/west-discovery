@@ -4,6 +4,18 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Added
+- Structured JSON logging to stdout for ECS/CloudWatch (`python-json-logger`).
+  Configure with `LOG_LEVEL` (default `INFO`), `LOG_FORMAT` (`json` default,
+  `text` for local; the Docker `development` stage sets `text`),
+  `SERVICE_NAME` and optional `APP_VERSION`.
+- Request logging middleware: one line per request (method, path, status,
+  `duration_ms`, client IP, user agent) with a request ID taken from
+  `X-Request-ID` / `X-Amzn-Trace-Id` or generated, returned in the
+  `X-Request-ID` response header and attached to every log line in the request.
+- Globus Search errors are now logged (upstream status, code, message and
+  request ID) before being translated to HTTP errors.
+
 ### Fixed
 - `total_count` can now be requested alongside frequency aggregations; the
   other requested facets are no longer dropped.
@@ -14,6 +26,10 @@ All notable changes to this project are documented here.
 - Default frequency aggregation `size` raised from 10 to 100 so
   high-cardinality facets (e.g. `institution_id`, `source_id`) are not
   silently truncated.
+- uvicorn's access log is disabled in favour of the request log, and
+  `hishel.asgi` logs are limited to warnings.
+- `app.handler` is now wrapped in `RequestLoggingMiddleware`, outside the cache
+  middleware, so cache hits are logged.
 
 ## [1.0.2] - 2026-10-29
 
