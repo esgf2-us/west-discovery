@@ -15,6 +15,11 @@ from stac_fastapi.extensions.core.filter.request import (
 )
 from typing_extensions import Annotated
 
+# Default number of buckets returned per frequency aggregation. The upstream
+# default of 10 silently truncates high-cardinality facets such as
+# institution_id or source_id.
+DEFAULT_FACET_SIZE = 2000
+
 
 @attr.s
 class GlobusAggregationExtensionGetRequest(
@@ -25,7 +30,7 @@ class GlobusAggregationExtensionGetRequest(
     collection_id: Optional[Annotated[str, Path(description="Collection ID")]] = (
         attr.ib(default=None)
     )
-    size: Optional[int] = attr.ib(default=10)
+    size: Optional[int] = attr.ib(default=DEFAULT_FACET_SIZE)
 
 
 class GlobusAggregationExtensionPostRequest(
@@ -42,6 +47,6 @@ class GlobusAggregationExtensionPostRequest(
     )
 
     size: Optional[int] = Field(
-        10,
+        DEFAULT_FACET_SIZE,
         description="The number of aggregation results to return.",
     )

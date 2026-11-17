@@ -16,7 +16,16 @@ All notable changes to this project are documented here.
 - Globus Search errors are now logged (upstream status, code, message and
   request ID) before being translated to HTTP errors.
 
+### Fixed
+- `total_count` can now be requested alongside frequency aggregations; the
+  other requested facets are no longer dropped.
+- `GET /aggregate` now applies `filter` / `filter-lang` (CQL2 text or JSON), as
+  `POST` already did. Malformed filters return 400.
+
 ### Changed
+- Default frequency aggregation `size` raised from 10 to 100 so
+  high-cardinality facets (e.g. `institution_id`, `source_id`) are not
+  silently truncated.
 - uvicorn's access log is disabled in favour of the request log, and
   `hishel.asgi` logs are limited to warnings.
 - `app.handler` is now wrapped in `RequestLoggingMiddleware`, outside the cache
